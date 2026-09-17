@@ -1,0 +1,759 @@
+:root {
+  --navy: #16283F;
+  --navy-deep: #0F1D30;
+  --amber: #C8912B;
+  --amber-soft: #EFD9AC;
+  --paper: #EEF1F6;
+  --card: #FFFFFF;
+  --ink: #1B2430;
+  --ink-soft: #5B6472;
+  --line: #DCE1E9;
+  --green: #2F8F5B;
+  --red: #BD4B4B;
+  --blue: #3D6FA8;
+  --violet: #7454A6;
+
+  --status-received: #5B6472;
+  --status-progress: #C8912B;
+  --status-completed: #3D6FA8;
+  --status-delivered: #2F8F5B;
+
+  --radius: 10px;
+
+  --font-ui: 'Inter', system-ui, sans-serif;
+  --font-display: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+}
+
+
+/* ---------------- General ---------------- */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+h1,
+h2 {
+  font-family: var(--font-display);
+  margin: 0;
+}
+
+button {
+  font-family: var(--font-ui);
+  cursor: pointer;
+}
+
+input,
+select {
+  font-family: var(--font-ui);
+}
+
+
+/* ---------------- Top bar ---------------- */
+
+.topbar {
+  background: var(--navy);
+  color: #fff;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.15);
+}
+
+.topbar-inner {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 16px 20px;
+
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 14px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.brand-mark {
+  color: var(--amber);
+  font-size: 20px;
+  line-height: 1;
+}
+
+.brand-text h1 {
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+
+.brand-text p {
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  color: #B9C3D2;
+}
+
+.sales-table {
+    max-height: 300px;
+    overflow-y: auto;
+    overflow-x: auto;
+}
+
+.sales-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: var(--card);
+}
+.table-wrap{
+  max-height: 300px;
+    overflow-y: auto;
+    overflow-x: auto;
+
+}
+
+.table-wrap thead th {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: var(--card);
+}
+.table-wrap tfoot td {
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
+    background: var(--card);
+}
+
+
+.sales-table tfoot td {
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
+    background: var(--card);
+}
+.table-wrap{
+   max-height: 300px;
+    overflow-y: auto;
+    overflow-x: auto;
+}
+
+.table-wrap thead th {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: var(--card);
+}
+
+.table-wrap tfoot td {
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
+    background: var(--card);
+}
+
+.date-controls {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  font-size: 11.5px;
+  color: #B9C3D2;
+}
+
+/* ---------------- Repairs Data Vertical Scroll ---------------- */
+
+.repair-table-scroll {
+    max-height: 300px;
+    overflow-y: auto;
+    overflow-x: auto;
+    border-top: 1px solid var(--line);
+}
+
+/* Keep table header visible while scrolling */
+.repair-table-scroll thead th {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: var(--card);
+}
+
+/* Smooth scrollbar */
+.repair-table-scroll {
+    scrollbar-width: thin;
+}
+
+.field input {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+
+  color: #fff;
+  border-radius: 7px;
+
+  padding: 7px 9px;
+  font-size: 13.5px;
+
+  color-scheme: dark;
+}
+
+.field input:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 1px;
+}
+
+
+/* ---------------- View toggle ---------------- */
+
+.view-toggle {
+  display: flex;
+
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 7px;
+
+  overflow: hidden;
+}
+
+.toggle-btn {
+  background: transparent;
+  border: none;
+
+  color: #C7D0DC;
+
+  font-size: 12.5px;
+  padding: 8px 12px;
+}
+
+.toggle-btn.active {
+  background: var(--amber);
+  color: var(--navy-deep);
+  font-weight: 600;
+}
+
+.toggle-btn:focus-visible {
+  outline: 2px solid #fff;
+}
+
+
+/* ---------------- Main layout ---------------- */
+
+main {
+  max-width: 1040px;
+  margin: 0 auto;
+
+  padding: 22px 20px 60px;
+
+  display: flex;
+  flex-direction: column;
+
+  gap: 20px;
+}
+
+
+/* ---------------- Summary ---------------- */
+
+.summary-strip {
+  display: grid;
+
+  grid-template-columns: repeat(7, minmax(140px, 1fr));
+
+  gap: 12px;
+
+  
+
+  padding-bottom: 2px;
+}
+
+.summary-card {
+  background: var(--card);
+
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--navy);
+
+  border-radius: var(--radius);
+
+  padding: 14px;
+
+  display: flex;
+  flex-direction: column;
+
+  gap: 6px;
+
+  min-width: 140px;
+}
+
+
+.summary-card.sales {
+  border-left-color: var(--green);
+}
+
+.summary-card.expenses {
+  border-left-color: var(--red);
+}
+
+.summary-card.purchases {
+  border-left-color: var(--blue);
+}
+
+.summary-card.enquiries {
+  border-left-color: var(--amber);
+}
+
+.summary-card.month-sales {
+  border-left-color: var(--green);
+  opacity: 0.85;
+}
+
+.summary-card.month-expenses {
+  border-left-color: var(--red);
+  opacity: 0.85;
+}
+
+.summary-card.repairs {
+  border-left-color: var(--violet);
+  overflow-y: auto;
+}
+
+.summary-label {
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.summary-value {
+  font-family: var(--font-display);
+
+  font-size: 20px;
+  font-weight: 600;
+
+  font-variant-numeric: tabular-nums;
+}
+
+
+/* ---------------- Ledger cards ---------------- */
+
+.ledger-card {
+  background: var(--card);
+
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+
+  padding: 18px 18px 8px;
+
+  border-top: 3px solid var(--navy);
+}
+
+.ledger-card.accent-sales {
+  border-top-color: var(--green);
+}
+
+.ledger-card.accent-expenses {
+  border-top-color: var(--red);
+}
+
+.ledger-card.accent-purchases {
+  border-top-color: var(--blue);
+}
+
+.ledger-card.accent-enquiries {
+  border-top-color: var(--amber);
+}
+
+.ledger-card.accent-repairs {
+  border-top-color: var(--violet);
+}
+
+.ledger-head {
+  margin-bottom: 14px;
+}
+
+.ledger-head h2 {
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.ledger-sub {
+  margin: 3px 0 0;
+
+  font-size: 12.5px;
+  color: var(--ink-soft);
+}
+
+
+/* ---------------- Entry forms ---------------- */
+
+.entry-form {
+  display: flex;
+  flex-wrap: wrap;
+
+  gap: 8px;
+
+  margin-bottom: 14px;
+}
+
+.entry-form input {
+  flex: 1 1 140px;
+
+  border: 1px solid var(--line);
+  border-radius: 7px;
+
+  padding: 9px 10px;
+
+  font-size: 13.5px;
+
+  background: #FAFBFD;
+}
+
+.entry-form input:focus-visible {
+  outline: 2px solid var(--navy);
+  outline-offset: 1px;
+}
+
+
+/* Select field */
+
+.entry-form select {
+  flex: 1 1 180px;
+
+  min-height: 40px;
+
+  border: 1px solid var(--line);
+  border-radius: 7px;
+
+  padding: 9px 10px;
+
+  font-size: 13.5px;
+
+  background: #FAFBFD;
+
+  color: var(--ink);
+}
+
+.entry-form select:focus-visible {
+  outline: 2px solid var(--navy);
+  outline-offset: 1px;
+}
+
+
+/* Form button */
+
+.entry-form button {
+  flex: 0 0 auto;
+
+  background: var(--navy);
+  color: #fff;
+
+  border: none;
+  border-radius: 7px;
+
+  padding: 9px 16px;
+
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.entry-form button:hover {
+  background: var(--navy-deep);
+}
+
+
+/* ---------------- Repairs ---------------- */
+
+.accent-repairs {
+  display: block;
+  width: 100%;
+}
+
+.accent-repairs .entry-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.accent-repairs .entry-form input {
+  flex: 1 1 180px;
+}
+
+.accent-repairs .entry-form select {
+  flex: 1 1 200px;
+}
+
+.accent-repairs .entry-form button {
+  flex: 0 0 auto;
+}
+
+.accent-repairs .table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+.accent-repairs .table-wrap table {
+  min-width: 800px;
+}
+
+
+/* ---------------- Tables ---------------- */
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+
+  border-collapse: collapse;
+
+  font-size: 13.5px;
+}
+
+thead th {
+  text-align: left;
+
+  font-weight: 600;
+
+  color: var(--ink-soft);
+
+  font-size: 12px;
+
+  padding: 8px 10px;
+
+  border-bottom: 1px solid var(--line);
+
+  white-space: nowrap;
+}
+
+tbody td,
+tfoot td {
+  padding: 9px 10px;
+
+  border-bottom: 1px solid var(--line);
+
+  white-space: nowrap;
+}
+
+tbody tr:hover {
+  background: #F7F9FC;
+}
+
+tfoot td {
+  font-weight: 600;
+
+  border-bottom: none;
+
+  border-top: 1px solid var(--line);
+
+  font-variant-numeric: tabular-nums;
+}
+
+td.amount-cell,
+th.amount-cell {
+  text-align: right;
+}
+
+
+/* ---------------- Delete button ---------------- */
+
+.row-delete {
+  background: none;
+
+  border: none;
+
+  color: var(--red);
+
+  font-size: 15px;
+
+  padding: 4px 6px;
+
+  border-radius: 5px;
+}
+
+
+
+.row-delete:hover {
+  background: #FBEAEA;
+}
+
+.row-edit {
+  background: none;
+
+  border: none;
+
+  color: var(--ink-soft);
+
+  font-size: 15px;
+
+  padding: 4px 6px;
+
+  border-radius: 5px;
+}
+
+.row-edit:hover {
+  background: #efeafb;
+}
+
+
+/* ---------------- Repair status dropdown ---------------- */
+
+.status-select {
+  font-family: var(--font-ui);
+
+  font-size: 12.5px;
+
+  font-weight: 600;
+
+  border: 1px solid var(--line);
+
+  border-radius: 20px;
+
+  padding: 5px 10px;
+
+  background: #FAFBFD;
+
+  cursor: pointer;
+}
+
+.status-select:focus-visible {
+  outline: 2px solid var(--navy);
+  outline-offset: 2px;
+}
+
+
+/* Status colors */
+
+.status-received {
+  color: #9A6B10;
+}
+
+.status-in_progress {
+  color: #3D6FA8;
+}
+
+.status-completed {
+  color: #2F8F5B;
+}
+
+.status-delivered {
+  color: #5B6472;
+}
+
+
+/* ---------------- Empty table row ---------------- */
+
+.empty-row td {
+  color: var(--ink-soft);
+
+  font-style: normal;
+
+  text-align: center;
+
+  padding: 16px 10px;
+}
+
+
+/* ---------------- Toast ---------------- */
+
+.toast {
+  position: fixed;
+
+  bottom: 18px;
+  left: 50%;
+
+  transform: translate(-50%, 12px);
+
+  background: var(--navy-deep);
+
+  color: #fff;
+
+  padding: 10px 18px;
+
+  border-radius: 8px;
+
+  font-size: 13.5px;
+
+  opacity: 0;
+
+  pointer-events: none;
+
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
+
+  z-index: 30;
+}
+
+.toast.show {
+  opacity: 1;
+
+  transform: translate(-50%, 0);
+}
+
+.toast.error {
+  background: var(--red);
+}
+
+
+/* ---------------- Responsive ---------------- */
+
+@media (max-width: 760px) {
+
+  .summary-strip {
+    grid-auto-flow: column;
+
+    grid-auto-columns: minmax(150px, 1fr);
+
+    grid-template-columns: none;
+  }
+
+  .topbar-inner {
+    flex-direction: column;
+
+    align-items: flex-start;
+  }
+
+  .date-controls {
+    width: 100%;
+  }
+
+  .accent-repairs .entry-form {
+    flex-direction: column;
+  }
+
+  .accent-repairs .entry-form input,
+  .accent-repairs .entry-form select,
+  .accent-repairs .entry-form button {
+    width: 100%;
+    flex: none;
+  }
+}
+
+
+/* ---------------- Reduced motion ---------------- */
+
+@media (prefers-reduced-motion: reduce) {
+
+  /* .toast {
+    transition: none;
+  } */
+
+}
