@@ -25,7 +25,9 @@
 }
 
 
-/* ---------------- General ---------------- */
+/* =========================================================
+   GENERAL
+========================================================= */
 
 * {
   box-sizing: border-box;
@@ -35,11 +37,21 @@ html,
 body {
   margin: 0;
   padding: 0;
+
   background: var(--paper);
   color: var(--ink);
+
   font-family: var(--font-ui);
   font-size: 15px;
   line-height: 1.5;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  overflow-x: hidden;
 }
 
 h1,
@@ -59,24 +71,32 @@ select {
 }
 
 
-/* ---------------- Top bar ---------------- */
+/* =========================================================
+   TOP BAR
+========================================================= */
 
 .topbar {
   background: var(--navy);
   color: #fff;
+
   position: sticky;
   top: 0;
-  z-index: 20;
+
+  z-index: 2000;
+
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.15);
 }
 
 .topbar-inner {
   max-width: 1040px;
+
   margin: 0 auto;
+
   padding: 16px 20px;
 
   display: flex;
   flex-wrap: wrap;
+
   align-items: center;
   justify-content: space-between;
 
@@ -86,132 +106,71 @@ select {
 .brand {
   display: flex;
   align-items: center;
+
   gap: 10px;
 }
 
 .brand-mark {
   color: var(--amber);
+
   font-size: 20px;
   line-height: 1;
 }
 
 .brand-text h1 {
   font-size: 19px;
+
   font-weight: 600;
+
   letter-spacing: 0.2px;
 }
 
 .brand-text p {
   margin: 2px 0 0;
+
   font-size: 12.5px;
+
   color: #B9C3D2;
 }
 
-.sales-table {
-    max-height: 300px;
-    overflow-y: auto;
-    overflow-x: auto;
-}
 
-.sales-table thead th {
-    position: sticky;
-    top: 0;
-    z-index: 5;
-    background: var(--card);
-}
-.table-wrap{
-  max-height: 300px;
-    overflow-y: auto;
-    overflow-x: auto;
-
-}
-
-.table-wrap thead th {
-    position: sticky;
-    top: 0;
-    z-index: 5;
-    background: var(--card);
-}
-.table-wrap tfoot td {
-    position: sticky;
-    bottom: 0;
-    z-index: 5;
-    background: var(--card);
-}
-
-
-.sales-table tfoot td {
-    position: sticky;
-    bottom: 0;
-    z-index: 5;
-    background: var(--card);
-}
-.table-wrap{
-   max-height: 300px;
-    overflow-y: auto;
-    overflow-x: auto;
-}
-
-.table-wrap thead th {
-    position: sticky;
-    top: 0;
-    z-index: 5;
-    background: var(--card);
-}
-
-.table-wrap tfoot td {
-    position: sticky;
-    bottom: 0;
-    z-index: 5;
-    background: var(--card);
-}
+/* =========================================================
+   DATE CONTROLS
+========================================================= */
 
 .date-controls {
   display: flex;
+
   align-items: flex-end;
+
   gap: 12px;
+
   flex-wrap: wrap;
 }
 
 .field {
   display: flex;
+
   flex-direction: column;
+
   gap: 4px;
 
   font-size: 11.5px;
+
   color: #B9C3D2;
-}
-
-/* ---------------- Repairs Data Vertical Scroll ---------------- */
-
-.repair-table-scroll {
-    max-height: 300px;
-    overflow-y: auto;
-    overflow-x: auto;
-    border-top: 1px solid var(--line);
-}
-
-/* Keep table header visible while scrolling */
-.repair-table-scroll thead th {
-    position: sticky;
-    top: 0;
-    z-index: 5;
-    background: var(--card);
-}
-
-/* Smooth scrollbar */
-.repair-table-scroll {
-    scrollbar-width: thin;
 }
 
 .field input {
   background: rgba(255, 255, 255, 0.08);
+
   border: 1px solid rgba(255, 255, 255, 0.2);
 
   color: #fff;
+
   border-radius: 7px;
 
   padding: 7px 9px;
+
   font-size: 13.5px;
 
   color-scheme: dark;
@@ -223,12 +182,15 @@ select {
 }
 
 
-/* ---------------- View toggle ---------------- */
+/* =========================================================
+   VIEW TOGGLE
+========================================================= */
 
 .view-toggle {
   display: flex;
 
   border: 1px solid rgba(255, 255, 255, 0.25);
+
   border-radius: 7px;
 
   overflow: hidden;
@@ -236,17 +198,21 @@ select {
 
 .toggle-btn {
   background: transparent;
+
   border: none;
 
   color: #C7D0DC;
 
   font-size: 12.5px;
+
   padding: 8px 12px;
 }
 
 .toggle-btn.active {
   background: var(--amber);
+
   color: var(--navy-deep);
+
   font-weight: 600;
 }
 
@@ -255,56 +221,782 @@ select {
 }
 
 
-/* ---------------- Main layout ---------------- */
+/* =========================================================
+   MAIN LAYOUT
+========================================================= */
 
 main {
+  width: 100%;
   max-width: 1040px;
+
   margin: 0 auto;
 
   padding: 22px 20px 60px;
 
   display: flex;
+
   flex-direction: column;
 
   gap: 20px;
 }
 
 
-/* ---------------- Summary ---------------- */
+/* =========================================================
+   SECTION NAVIGATION
+========================================================= */
 
-.summary-strip {
-  display: grid;
+/* =========================================================
+   FIXED SECTION NAVIGATION
+   Dashboard / Sales / Purchase / Inventory / etc.
+========================================================= */
 
-  grid-template-columns: repeat(7, minmax(140px, 1fr));
+.section-nav {
+  width: 100%;
 
-  gap: 12px;
+  display: flex;
 
-  
+  gap: 10px;
 
-  padding-bottom: 2px;
+  padding: 12px;
+
+  margin: 0 0 20px 0;
+
+  background: #ffffff;
+
+  border: 1px solid #e5e7eb;
+
+  border-radius: 12px;
+
+  position: sticky;
+
+  /*
+     Topbar is approximately 70px high.
+     Keep navigation below it.
+  */
+  top: 70px;
+
+  z-index: 1000;
+
+  overflow-x: auto;
+
+  scrollbar-width: thin;
+
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
+
+/* Navigation buttons */
+
+.section-nav button,
+.section-nav-btn {
+  flex: 0 0 auto;
+
+  border: none;
+
+  background: #f3f4f6;
+
+  color: #374151;
+
+  padding: 10px 16px;
+
+  border-radius: 8px;
+
+  font-size: 14px;
+
+  font-weight: 600;
+
+  cursor: pointer;
+
+  white-space: nowrap;
+
+  transition:
+    background 0.2s ease,
+    color 0.2s ease;
+}
+
+
+/* Hover */
+
+.section-nav button:hover,
+.section-nav-btn:hover {
+  background: #e5e7eb;
+}
+
+
+/* Active button */
+
+.section-nav button.active,
+.section-nav-btn.active {
+  background: #111827;
+
+  color: #ffffff;
+}
+
+
+/* Mobile */
+
+@media (max-width: 700px) {
+
+  .section-nav {
+    top: 70px;
+
+    gap: 6px;
+
+    padding: 8px;
+  }
+
+  .section-nav button,
+  .section-nav-btn {
+    padding: 9px 12px;
+
+    font-size: 13px;
+  }
+}
+
+/* =========================================================
+   INVENTORY SEARCH / SORT
+========================================================= */
+
+.inventory-controls {
+    width: 100%;
+
+    display: flex;
+
+    gap: 10px;
+
+    margin-bottom: 14px;
+
+    align-items: center;
+}
+
+.inventory-controls input {
+    flex: 1;
+
+    min-width: 0;
+
+    border: 1px solid var(--line);
+
+    border-radius: 7px;
+
+    padding: 10px 12px;
+
+    font-size: 13.5px;
+
+    background: #FAFBFD;
+
+    color: var(--ink);
+}
+
+.inventory-controls input:focus {
+    outline: 2px solid var(--navy);
+
+    outline-offset: 1px;
+}
+
+.inventory-controls select {
+    flex: 0 0 190px;
+
+    border: 1px solid var(--line);
+
+    border-radius: 7px;
+
+    padding: 10px 12px;
+
+    font-size: 13.5px;
+
+    background: #FAFBFD;
+
+    color: var(--ink);
+
+    cursor: pointer;
+}
+
+.inventory-controls select:focus {
+    outline: 2px solid var(--navy);
+
+    outline-offset: 1px;
+}
+
+
+/* Mobile */
+
+@media (max-width: 600px) {
+
+    .inventory-controls {
+        flex-direction: column;
+
+        align-items: stretch;
+    }
+
+    .inventory-controls input,
+    .inventory-controls select {
+        width: 100%;
+
+        flex: none;
+    }
+
+}
+
+/* =========================================================
+   INVENTORY PRODUCT SEARCH
+========================================================= */
+
+.inventory-search {
+    width: 100%;
+    margin-bottom: 14px;
+}
+
+.inventory-search input {
+    width: 100%;
+    max-width: 400px;
+
+    padding: 10px 12px;
+
+    border: 1px solid var(--line);
+    border-radius: 7px;
+
+    background: #FAFBFD;
+
+    color: var(--ink);
+
+    font-family: var(--font-ui);
+    font-size: 13.5px;
+
+    outline: none;
+}
+
+/* ============================================================
+   INVENTORY SEARCH
+   ============================================================ */
+
+.inventory-search {
+    width: 100%;
+    margin-bottom: 14px;
+}
+
+.inventory-search input {
+    width: 100%;
+    max-width: 400px;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    background: #FAFBFD;
+    color: var(--ink);
+    font-family: var(--font-ui);
+    font-size: 13.5px;
+    outline: none;
+    box-sizing: border-box;
+}
+
+.inventory-search input:focus {
+    border-color: var(--navy);
+    box-shadow: 0 0 0 2px rgba(22, 40, 63, 0.08);
+}
+
+
+/* ============================================================
+   REPAIR SEARCH & STATUS FILTER
+   ============================================================ */
+
+.repair-filters {
+    width: 100%;
+    display: flex;
+    gap: 12px;
+    margin-bottom: 14px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.repair-filters input {
+    width: 100%;
+    max-width: 420px;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    background: #FAFBFD;
+    color: var(--ink);
+    font-family: var(--font-ui);
+    font-size: 13.5px;
+    outline: none;
+}
+
+.repair-filters select {
+    min-width: 190px;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    background: #FAFBFD;
+    color: var(--ink);
+    font-family: var(--font-ui);
+    font-size: 13.5px;
+    outline: none;
+}
+
+.repair-filters input:focus,
+.repair-filters select:focus {
+    border-color: var(--navy);
+    box-shadow: 0 0 0 2px rgba(22, 40, 63, 0.08);
+}
+
+.repair-filters input::placeholder {
+    color: var(--ink-soft);
+}
+.inventory-search input::placeholder {
+    color: var(--ink-soft);
+}
+
+.inventory-search input:focus {
+    border-color: var(--navy);
+
+    box-shadow:
+        0 0 0 2px rgba(22, 40, 63, 0.08);
+}
+
+.inventory-search input::placeholder {
+    color: var(--ink-soft);
+}
+
+/* =========================================================
+   DASHBOARD
+========================================================= */
+
+#dashboardSection {
+  width: 100%;
+
+  margin: 0 0 24px 0;
+
+  overflow: visible;
+}
+
+
+/* =========================================================
+   SIM RECHARGE - ADD OPERATOR BALANCE
+   ========================================================= */
+
+.recharge-add-box {
+    margin-top: 20px;
+    padding: 18px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: #FAFBFD;
+}
+
+.recharge-add-box h3 {
+    margin: 0 0 15px;
+    color: var(--ink);
+    font-family: var(--font-ui);
+    font-size: 16px;
+    font-weight: 700;
+}
+
+#rechargeAddForm {
+    display: flex;
+    align-items: flex-end;
+    gap: 14px;
+    flex-wrap: wrap;
+}
+
+#rechargeAddForm .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 200px;
+}
+
+#rechargeAddForm .form-group label {
+    color: var(--ink);
+    font-family: var(--font-ui);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+#rechargeAddForm select,
+#rechargeAddForm input {
+    width: 100%;
+    min-height: 40px;
+    padding: 9px 12px;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    background: #FFFFFF;
+    color: var(--ink);
+    font-family: var(--font-ui);
+    font-size: 13.5px;
+    outline: none;
+    box-sizing: border-box;
+}
+
+#rechargeAddForm select:focus,
+#rechargeAddForm input:focus {
+    border-color: var(--navy);
+    box-shadow: 0 0 0 2px rgba(22, 40, 63, 0.08);
+}
+
+#rechargeAddForm input::placeholder {
+    color: var(--ink-soft);
+}
+
+#rechargeAddForm button {
+    min-height: 40px;
+    padding: 9px 18px;
+    border: 0;
+    border-radius: 7px;
+    background: var(--navy);
+    color: #FFFFFF;
+    font-family: var(--font-ui);
+    font-size: 13.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: 0.2s ease;
+}
+
+#rechargeAddForm button:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+}
+
+#rechargeAddForm button:active {
+    transform: translateY(0);
+}
+
+
+/* =========================================================
+   RECHARGE BALANCE CARDS
+   ========================================================= */
+
+.recharge-balance-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-top: 18px;
+}
+
+.balance-card {
+    padding: 15px;
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    background: #FFFFFF;
+}
+
+.balance-card span {
+    display: block;
+    margin-bottom: 7px;
+    color: var(--ink-soft);
+    font-family: var(--font-ui);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.balance-card strong {
+    display: block;
+    color: var(--ink);
+    font-family: var(--font-ui);
+    font-size: 20px;
+    font-weight: 700;
+}
+
+
+/* =========================================================
+   MOBILE
+   ========================================================= */
+
+@media (max-width: 768px) {
+
+    #rechargeAddForm {
+        display: block;
+    }
+
+    #rechargeAddForm .form-group {
+        width: 100%;
+        margin-bottom: 12px;
+    }
+
+    #rechargeAddForm button {
+        width: 100%;
+    }
+
+    .recharge-balance-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+
+@media (max-width: 480px) {
+
+    .recharge-add-box {
+        padding: 14px;
+    }
+
+    .recharge-balance-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.recharge-type {
+    display: inline-block;
+    padding: 4px 9px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.recharge-add-type {
+    background: #E8F5E9;
+    color: #2E7D32;
+}
+
+.recharge-sale-type {
+    background: #E3F2FD;
+    color: #1565C0;
+}
+/* ============================================================
+   SECTION NAVIGATION SCROLL POSITION
+   ============================================================ */
+
+section[id] {
+    scroll-margin-top: 300px;
+}
+
+/* =========================================================
+   DASHBOARD DAY CARDS
+   7 CARDS
+========================================================= */
+
+.dashboard-day-cards {
+  width: 100%;
+
+  display: grid;
+
+  /*
+     4 cards in first row
+     3 cards in second row
+  */
+
+  grid-template-columns:
+    repeat(4, minmax(0, 1fr));
+
+  gap: 16px;
+
+  align-items: stretch;
+
+  box-sizing: border-box;
+}
+
+/* ============================================================
+   NEGATIVE STOCK
+   ============================================================ */
+
+.negative-stock-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.negative-stock-option input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+}
+
+.stock-shortage {
+    font-weight: 700;
+}
+
+/* ============================================================
+   OPERATOR WALLET BALANCES
+   ============================================================ */
+
+.operator-wallet-section {
+    margin-top: 18px;
+}
+
+.operator-wallet-title {
+    margin: 0 0 12px 0;
+    font-size: 18px;
+    font-weight: 700;
+}
+
+.operator-balance-list {
+    display: grid;
+    grid-template-columns:
+        repeat(4, minmax(180px, 1fr));
+    gap: 12px;
+}
+
+.operator-balance-card {
+    padding: 16px;
+    border-radius: 12px;
+    border: 1px solid #ddd;
+    background: #fff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.operator-balance-name {
+    font-size: 17px;
+    font-weight: 700;
+    margin-bottom: 6px;
+}
+
+.operator-balance-label {
+    font-size: 12px;
+    opacity: 0.7;
+    margin-bottom: 6px;
+}
+
+.operator-balance-amount {
+    font-size: 22px;
+    font-weight: 800;
+}
+
+@media (max-width: 900px) {
+
+    .operator-balance-list {
+        grid-template-columns:
+            repeat(2, minmax(160px, 1fr));
+    }
+
+}
+
+@media (max-width: 550px) {
+
+    .operator-balance-list {
+        grid-template-columns: 1fr;
+    }
+
+}
+
+/* =========================================================
+   DASHBOARD MONTH CARDS
+   2 CARDS
+========================================================= */
+
+.dashboard-month-cards {
+  width: 100%;
+
+  display: grid;
+
+  grid-template-columns:
+    repeat(2, minmax(0, 1fr));
+
+  gap: 16px;
+
+  align-items: stretch;
+
+  box-sizing: border-box;
+}
+
+
+/* =========================================================
+   COMMON SUMMARY CARD
+========================================================= */
+
 .summary-card {
+  width: 100%;
+
+  min-width: 0;
+
+  min-height: 105px;
+
+  padding: 18px 16px;
+
+  border-radius: 14px;
+
   background: var(--card);
 
   border: 1px solid var(--line);
+
   border-left: 4px solid var(--navy);
 
-  border-radius: var(--radius);
-
-  padding: 14px;
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.06);
 
   display: flex;
+
   flex-direction: column;
 
-  gap: 6px;
+  justify-content: center;
 
-  min-width: 140px;
+  gap: 4px;
+
+  overflow: hidden;
+
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.summary-card:hover {
+  transform: translateY(-2px);
+
+  box-shadow:
+    0 7px 18px rgba(0, 0, 0, 0.09);
 }
 
 
+/* =========================================================
+   SUMMARY TEXT
+========================================================= */
+
+.summary-label {
+  display: block;
+
+  font-size: 13px;
+
+  font-weight: 600;
+
+  color: var(--ink-soft);
+
+  margin-bottom: 8px;
+
+  white-space: nowrap;
+
+  overflow: hidden;
+
+  text-overflow: ellipsis;
+}
+
+.summary-value {
+  display: block;
+
+  font-family: var(--font-display);
+
+  font-size: 24px;
+
+  font-weight: 700;
+
+  color: var(--ink);
+
+  line-height: 1.2;
+
+  white-space: nowrap;
+
+  overflow: hidden;
+
+  text-overflow: ellipsis;
+
+  font-variant-numeric: tabular-nums;
+}
+
+
+/* =========================================================
+   DAY DASHBOARD CARD COLORS
+========================================================= */
+
 .summary-card.sales {
   border-left-color: var(--green);
+}
+
+.summary-card.payment-received {
+  border-left-color: var(--green);
+}
+
+.summary-card.payment-balance {
+  border-left-color: var(--amber);
 }
 
 .summary-card.expenses {
@@ -319,47 +1011,42 @@ main {
   border-left-color: var(--amber);
 }
 
+.summary-card.repairs {
+  border-left-color: var(--violet);
+}
+
+
+/* =========================================================
+   MONTH DASHBOARD CARD COLORS
+========================================================= */
+
 .summary-card.month-sales {
   border-left-color: var(--green);
-  opacity: 0.85;
 }
 
 .summary-card.month-expenses {
   border-left-color: var(--red);
-  opacity: 0.85;
-}
-
-.summary-card.repairs {
-  border-left-color: var(--violet);
-  overflow-y: auto;
-}
-
-.summary-label {
-  font-size: 12px;
-  color: var(--ink-soft);
-}
-
-.summary-value {
-  font-family: var(--font-display);
-
-  font-size: 20px;
-  font-weight: 600;
-
-  font-variant-numeric: tabular-nums;
 }
 
 
-/* ---------------- Ledger cards ---------------- */
+/* =========================================================
+   LEDGER CARDS
+========================================================= */
 
 .ledger-card {
+  width: 100%;
+
   background: var(--card);
 
   border: 1px solid var(--line);
+
   border-radius: var(--radius);
 
   padding: 18px 18px 8px;
 
   border-top: 3px solid var(--navy);
+
+  overflow: hidden;
 }
 
 .ledger-card.accent-sales {
@@ -388,6 +1075,7 @@ main {
 
 .ledger-head h2 {
   font-size: 17px;
+
   font-weight: 600;
 }
 
@@ -395,14 +1083,20 @@ main {
   margin: 3px 0 0;
 
   font-size: 12.5px;
+
   color: var(--ink-soft);
 }
 
 
-/* ---------------- Entry forms ---------------- */
+/* =========================================================
+   ENTRY FORMS
+========================================================= */
 
 .entry-form {
+  width: 100%;
+
   display: flex;
+
   flex-wrap: wrap;
 
   gap: 8px;
@@ -413,7 +1107,10 @@ main {
 .entry-form input {
   flex: 1 1 140px;
 
+  min-width: 0;
+
   border: 1px solid var(--line);
+
   border-radius: 7px;
 
   padding: 9px 10px;
@@ -425,18 +1122,24 @@ main {
 
 .entry-form input:focus-visible {
   outline: 2px solid var(--navy);
+
   outline-offset: 1px;
 }
 
 
-/* Select field */
+/* =========================================================
+   SELECT
+========================================================= */
 
 .entry-form select {
   flex: 1 1 180px;
 
+  min-width: 0;
+
   min-height: 40px;
 
   border: 1px solid var(--line);
+
   border-radius: 7px;
 
   padding: 9px 10px;
@@ -450,24 +1153,30 @@ main {
 
 .entry-form select:focus-visible {
   outline: 2px solid var(--navy);
+
   outline-offset: 1px;
 }
 
 
-/* Form button */
+/* =========================================================
+   FORM BUTTON
+========================================================= */
 
 .entry-form button {
   flex: 0 0 auto;
 
   background: var(--navy);
+
   color: #fff;
 
   border: none;
+
   border-radius: 7px;
 
   padding: 9px 16px;
 
   font-size: 13.5px;
+
   font-weight: 600;
 }
 
@@ -476,16 +1185,21 @@ main {
 }
 
 
-/* ---------------- Repairs ---------------- */
+/* =========================================================
+   REPAIRS
+========================================================= */
 
 .accent-repairs {
   display: block;
+
   width: 100%;
 }
 
 .accent-repairs .entry-form {
   display: flex;
+
   flex-wrap: wrap;
+
   gap: 8px;
 }
 
@@ -503,8 +1217,11 @@ main {
 
 .accent-repairs .table-wrap {
   width: 100%;
+
   overflow-x: auto;
+
   overflow-y: hidden;
+
   -webkit-overflow-scrolling: touch;
 }
 
@@ -513,11 +1230,29 @@ main {
 }
 
 
-/* ---------------- Tables ---------------- */
+/* =========================================================
+   TABLE WRAPPERS
+========================================================= */
 
-.table-wrap {
+.table-wrap,
+.sales-table,
+.inventory-table-scroll,
+.repair-table-scroll {
+  width: 100%;
+
+  max-height: 300px;
+
+  overflow-y: auto;
+
   overflow-x: auto;
+
+  scrollbar-width: thin;
 }
+
+
+/* =========================================================
+   TABLES
+========================================================= */
 
 table {
   width: 100%;
@@ -556,15 +1291,52 @@ tbody tr:hover {
   background: #F7F9FC;
 }
 
-tfoot td {
-  font-weight: 600;
 
-  border-bottom: none;
+/* =========================================================
+   STICKY TABLE HEADERS
+========================================================= */
+
+.sales-table thead th,
+.table-wrap thead th,
+.inventory-table-scroll thead th,
+.repair-table-scroll thead th {
+  position: sticky;
+
+  top: 0;
+
+  z-index: 5;
+
+  background: var(--card);
+}
+
+
+/* =========================================================
+   STICKY TABLE FOOTER
+========================================================= */
+
+.sales-table tfoot td,
+.table-wrap tfoot td {
+  position: sticky;
+
+  bottom: 0;
+
+  z-index: 5;
+
+  background: var(--card);
+
+  font-weight: 600;
 
   border-top: 1px solid var(--line);
 
+  border-bottom: none;
+
   font-variant-numeric: tabular-nums;
 }
+
+
+/* =========================================================
+   AMOUNT CELLS
+========================================================= */
 
 td.amount-cell,
 th.amount-cell {
@@ -572,7 +1344,9 @@ th.amount-cell {
 }
 
 
-/* ---------------- Delete button ---------------- */
+/* =========================================================
+   DELETE BUTTON
+========================================================= */
 
 .row-delete {
   background: none;
@@ -588,11 +1362,14 @@ th.amount-cell {
   border-radius: 5px;
 }
 
-
-
 .row-delete:hover {
   background: #FBEAEA;
 }
+
+
+/* =========================================================
+   EDIT BUTTON
+========================================================= */
 
 .row-edit {
   background: none;
@@ -613,7 +1390,9 @@ th.amount-cell {
 }
 
 
-/* ---------------- Repair status dropdown ---------------- */
+/* =========================================================
+   REPAIR STATUS DROPDOWN
+========================================================= */
 
 .status-select {
   font-family: var(--font-ui);
@@ -631,15 +1410,20 @@ th.amount-cell {
   background: #FAFBFD;
 
   cursor: pointer;
+
+  max-width: 190px;
 }
 
 .status-select:focus-visible {
   outline: 2px solid var(--navy);
+
   outline-offset: 2px;
 }
 
 
-/* Status colors */
+/* =========================================================
+   REPAIR STATUS COLORS
+========================================================= */
 
 .status-received {
   color: #9A6B10;
@@ -658,7 +1442,18 @@ th.amount-cell {
 }
 
 
-/* ---------------- Empty table row ---------------- */
+/* =========================================================
+   REPAIR TABLE SCROLL
+========================================================= */
+
+.repair-table-scroll {
+  border-top: 1px solid var(--line);
+}
+
+
+/* =========================================================
+   EMPTY TABLE ROW
+========================================================= */
 
 .empty-row td {
   color: var(--ink-soft);
@@ -671,12 +1466,15 @@ th.amount-cell {
 }
 
 
-/* ---------------- Toast ---------------- */
+/* =========================================================
+   TOAST
+========================================================= */
 
 .toast {
   position: fixed;
 
   bottom: 18px;
+
   left: 50%;
 
   transform: translate(-50%, 12px);
@@ -699,7 +1497,7 @@ th.amount-cell {
     opacity 0.2s ease,
     transform 0.2s ease;
 
-  z-index: 30;
+  z-index: 3000;
 }
 
 .toast.show {
@@ -713,17 +1511,44 @@ th.amount-cell {
 }
 
 
-/* ---------------- Responsive ---------------- */
+/* =========================================================
+   DASHBOARD - LARGE LAPTOP
+========================================================= */
 
-@media (max-width: 760px) {
+@media (max-width: 1200px) {
 
-  .summary-strip {
-    grid-auto-flow: column;
-
-    grid-auto-columns: minmax(150px, 1fr);
-
-    grid-template-columns: none;
+  .dashboard-day-cards {
+    grid-template-columns:
+      repeat(3, minmax(0, 1fr));
   }
+
+}
+
+
+/* =========================================================
+   TABLET
+========================================================= */
+
+@media (max-width: 850px) {
+
+  .dashboard-day-cards {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
+  }
+
+  .dashboard-month-cards {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
+  }
+
+}
+
+
+/* =========================================================
+   MOBILE
+========================================================= */
+
+@media (max-width: 700px) {
 
   .topbar-inner {
     flex-direction: column;
@@ -735,6 +1560,41 @@ th.amount-cell {
     width: 100%;
   }
 
+  .section-nav {
+    gap: 6px;
+
+    padding: 8px;
+  }
+
+  .section-nav button,
+  .section-nav-btn {
+    padding: 9px 12px;
+
+    font-size: 13px;
+  }
+
+  .dashboard-day-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-month-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .summary-card {
+    min-height: 90px;
+
+    padding: 16px;
+  }
+
+  .summary-label {
+    font-size: 12px;
+  }
+
+  .summary-value {
+    font-size: 21px;
+  }
+
   .accent-repairs .entry-form {
     flex-direction: column;
   }
@@ -743,17 +1603,149 @@ th.amount-cell {
   .accent-repairs .entry-form select,
   .accent-repairs .entry-form button {
     width: 100%;
+
     flex: none;
   }
+
 }
 
 
-/* ---------------- Reduced motion ---------------- */
+/* =========================================================
+   SMALL MOBILE
+========================================================= */
+
+@media (max-width: 500px) {
+
+  main {
+    padding-left: 12px;
+
+    padding-right: 12px;
+  }
+
+  .dashboard-day-cards,
+  .dashboard-month-cards {
+    grid-template-columns: 1fr;
+
+    gap: 12px;
+  }
+
+  .summary-card {
+    min-height: 85px;
+
+    padding: 14px;
+  }
+
+  .summary-value {
+    font-size: 20px;
+  }
+
+}
+
+/* ============================================================
+   INVENTORY STOCK ALERTS
+   ============================================================ */
+
+.inventory-stock-alerts {
+    margin: 18px 0;
+    padding: 18px;
+    border-radius: 14px;
+    border: 1px solid #ddd;
+    background: #fff;
+}
+
+.inventory-alert-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+    font-size: 18px;
+}
+
+.inventory-alert-count {
+    margin-left: 10px;
+    font-size: 13px;
+    opacity: 0.65;
+}
+
+.inventory-alert-grid {
+    display: grid;
+    grid-template-columns:
+        repeat(3, minmax(200px, 1fr));
+    gap: 14px;
+}
+
+.inventory-alert-card {
+    padding: 15px;
+    border-radius: 12px;
+    border: 1px solid #ddd;
+}
+
+.inventory-alert-card-title {
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 5px;
+}
+
+.inventory-alert-card-count {
+    font-size: 28px;
+    font-weight: 800;
+    margin-bottom: 12px;
+}
+
+.inventory-alert-products {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+}
+
+.inventory-alert-product {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 7px 9px;
+    border-radius: 7px;
+    background: #f5f5f5;
+    font-size: 13px;
+}
+
+.inventory-alert-product strong {
+    font-weight: 800;
+}
+
+.inventory-alert-empty {
+    font-size: 13px;
+    opacity: 0.6;
+}
+
+.inventory-all-good {
+    padding: 12px;
+    border-radius: 8px;
+    font-weight: 600;
+}
+
+@media (max-width: 800px) {
+
+    .inventory-alert-grid {
+        grid-template-columns: 1fr;
+    }
+
+}
+
+
+/* =========================================================
+   REDUCED MOTION
+========================================================= */
 
 @media (prefers-reduced-motion: reduce) {
 
-  /* .toast {
-    transition: none;
-  } */
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+  }
 
 }

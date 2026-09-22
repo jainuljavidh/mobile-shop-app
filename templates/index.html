@@ -12,6 +12,172 @@
 
     <title>Shop Ledger — Mobile Shop Management</title>
 
+    <style>
+        .repair-customer-number {
+            border: 0;
+            background: transparent;
+            padding: 4px 6px;
+            margin: 0;
+            color: inherit;
+            text-decoration: underline;
+            cursor: pointer;
+            font: inherit;
+            font-weight: 600;
+        }
+
+        .repair-customer-number:hover {
+            opacity: 0.75;
+        }
+
+        .repair-details-modal {
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.55);
+        }
+
+        .repair-details-modal.open {
+            display: flex;
+        }
+
+        .repair-details-dialog {
+            width: min(760px, 100%);
+            max-height: 90vh;
+            overflow: auto;
+            background: #fff;
+            border-radius: 16px;
+            padding: 22px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+        }
+
+        .repair-details-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 18px;
+        }
+
+        .repair-details-header h3 {
+            margin: 0;
+        }
+
+        .repair-details-close {
+            border: 0;
+            background: transparent;
+            font-size: 28px;
+            line-height: 1;
+            cursor: pointer;
+        }
+
+        .repair-detail-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+        }
+
+        .repair-detail-grid > div {
+            padding: 12px;
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            border-radius: 10px;
+        }
+
+        .repair-detail-grid span {
+            display: block;
+            font-size: 12px;
+            opacity: 0.7;
+            margin-bottom: 4px;
+        }
+
+        .repair-detail-grid strong {
+            display: block;
+            word-break: break-word;
+        }
+
+        .repair-time-detail {
+            grid-column: span 1;
+        }
+
+        @media (max-width: 640px) {
+            .repair-detail-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+
+
+    <style>
+        .master-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .master-panel {
+            padding: 16px;
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.72);
+        }
+
+        .master-panel h3 {
+            margin: 0 0 6px;
+        }
+
+        .master-panel p {
+            margin: 0 0 14px;
+            font-size: 13px;
+            opacity: 0.75;
+        }
+
+        .master-form {
+            display: grid;
+            gap: 10px;
+        }
+
+        .master-form select,
+        .master-form input,
+        .master-form button {
+            width: 100%;
+        }
+
+        .master-table-wrap {
+            overflow-x: auto;
+            margin-top: 16px;
+        }
+
+        .master-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .master-table th,
+        .master-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+            text-align: left;
+            vertical-align: middle;
+        }
+
+        .master-help {
+            margin: 0 0 16px;
+            padding: 12px 14px;
+            border-radius: 12px;
+            background: rgba(0, 0, 0, 0.035);
+        }
+
+        @media (max-width: 900px) {
+            .master-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+
 
     <!-- Google Fonts -->
 
@@ -29,6 +195,9 @@
         rel="stylesheet"
         href="{{ url_for('static', filename='css/style.css') }}"
     >
+
+
+    
 
 </head>
 
@@ -146,308 +315,642 @@
 
 
         <!-- =================================================
-             DASHBOARD SUMMARY
+     DASHBOARD SUMMARY
+================================================== -->
+
+<section
+    id="dashboardSection"
+    class="summary-strip"
+    aria-label="Business summary"
+>
+
+
+    <!-- =================================================
+         DAY VIEW CARDS
+    ================================================== -->
+
+    <div
+        class="dashboard-day-cards"
+        id="dashboardDayCards"
+    >
+
+
+        <!-- TODAY'S SALES -->
+
+        <div class="summary-card sales">
+
+            <span class="summary-label">
+                Today's Sales
+            </span>
+
+            <span
+                class="summary-value"
+                id="sumSales"
+            >
+                ₹0
+            </span>
+
+        </div>
+
+
+        <!-- PAYMENTS RECEIVED -->
+
+        <div class="summary-card payment-received">
+
+            <span class="summary-label">
+                Payments Received
+            </span>
+
+            <span
+                class="summary-value"
+                id="sumPaymentsReceived"
+            >
+                ₹0
+            </span>
+
+        </div>
+
+
+        <!-- PENDING PAYMENTS -->
+
+        <div class="summary-card payment-balance">
+
+            <span class="summary-label">
+                Pending Payments
+            </span>
+
+            <span
+                class="summary-value"
+                id="sumPaymentBalance"
+            >
+                ₹0
+            </span>
+
+        </div>
+
+
+        <!-- TODAY'S EXPENSES -->
+
+        <div class="summary-card expenses">
+
+            <span class="summary-label">
+                Today's Expenses
+            </span>
+
+            <span
+                class="summary-value"
+                id="sumExpenses"
+            >
+                ₹0
+            </span>
+
+        </div>
+
+
+        <!-- TODAY'S PURCHASES -->
+
+        <div class="summary-card purchases">
+
+            <span class="summary-label">
+                Today's Purchases
+            </span>
+
+            <span
+                class="summary-value"
+                id="sumPurchases"
+            >
+                ₹0
+            </span>
+
+        </div>
+
+
+        <!-- CUSTOMER ENQUIRIES -->
+
+        <div class="summary-card enquiries">
+
+            <span class="summary-label">
+                Customer Enquiries
+            </span>
+
+            <span
+                class="summary-value"
+                id="sumEnquiries"
+            >
+                0
+            </span>
+
+        </div>
+
+
+        <!-- ACTIVE REPAIRS -->
+
+        <div class="summary-card repairs">
+
+            <span class="summary-label">
+                Active Repairs
+            </span>
+
+            <span
+                class="summary-value"
+                id="sumActiveRepairs"
+            >
+                0
+            </span>
+
+        </div>
+
+
+    </div>
+
+
+    <!-- =================================================
+         MONTH VIEW CARDS
+    ================================================== -->
+
+    <div
+        class="dashboard-month-cards"
+        id="dashboardMonthCards"
+        style="display: none;"
+    >
+
+
+        <!-- MONTH'S SALES -->
+
+        <div class="summary-card month-sales">
+
+            <span class="summary-label">
+                Month's Sales
+            </span>
+
+            <span
+                class="summary-value"
+                id="sumMonthSales"
+            >
+                ₹0
+            </span>
+
+        </div>
+
+
+        <!-- MONTH'S EXPENSES -->
+
+        <div class="summary-card month-expenses">
+
+            <span class="summary-label">
+                Month's Expenses
+            </span>
+
+            <span
+                class="summary-value"
+                id="sumMonthExpenses"
+            >
+                ₹0
+            </span>
+
+        </div>
+
+
+    </div>
+
+
+</section>
+    
+<!-- SECTION NAVIGATION -->
+
+<nav class="section-nav" id="sectionNavigation" aria-label="Shop sections">
+
+    <button type="button" class="section-nav-btn active" data-section="dashboardSection">
+        Dashboard
+    </button>
+
+    <button type="button" class="section-nav-btn" data-section="masterSection">
+        Master
+    </button>
+
+    <button type="button" class="section-nav-btn" data-section="salesSection">
+        Sales
+    </button>
+
+    <button type="button" class="section-nav-btn" data-section="purchasesSection">
+        Purchases
+    </button>
+
+    <button type="button" class="section-nav-btn" data-section="inventorySection">
+        Inventory
+    </button>
+
+    <button type="button" class="section-nav-btn" data-section="expensesSection">
+        Expenses
+    </button>
+
+    <button type="button" class="section-nav-btn" data-section="enquiriesSection">
+        Enquiries
+    </button>
+
+    <button type="button" class="section-nav-btn" data-section="repairsSection">
+        Repairs Tracker
+    </button>
+
+    <button type="button" class="section-nav-btn" data-section="paymentsSection">
+        Payment Tracking
+    </button>
+
+</nav>
+
+
+
+
+
+
+
+
+        <!-- =================================================
+             MASTER DATA
         ================================================== -->
 
         <section
-            class="summary-strip"
-            id=""
-            aria-label="Business summary"
+            id="masterSection"
+            class="ledger-card accent-inventory"
+            aria-label="Master data"
         >
 
+            <div class="ledger-head">
 
-            <!-- TODAY SALES -->
+                <h2>Master</h2>
 
-            <div class="summary-card sales">
-
-                <span class="summary-label">
-                    Today's sales
-                </span>
-
-                <span
-                    class="summary-value"
-                    id="sumSales"
-                >
-                    ₹0
-                </span>
-
-            </div>
-            <!-- PAYMENT RECEIVED -->
-
-<div class="summary-card payment-received">
-
-    <span class="summary-label">
-        Payments received
-    </span>
-
-    <span
-        class="summary-value"
-        id="sumPaymentsReceived"
-    >
-        ₹0
-    </span>
-
-</div>
-
-
-<!-- PAYMENT BALANCE -->
-
-<div class="summary-card payment-balance">
-
-    <span class="summary-label">
-        Pending payments
-    </span>
-
-    <span
-        class="summary-value"
-        id="sumPaymentBalance"
-    >
-        ₹0
-    </span>
-
-</div>
-
-
-            <!-- TODAY EXPENSES -->
-
-            <div class="summary-card expenses">
-
-                <span class="summary-label">
-                    Today's expenses
-                </span>
-
-                <span
-                    class="summary-value"
-                    id="sumExpenses"
-                >
-                    ₹0
-                </span>
+                <p class="ledger-sub">
+                    Create categories, models and part / item names for Inventory dropdowns
+                </p>
 
             </div>
 
+            <div class="master-help">
+                <strong>How it works:</strong>
+                Create a Category first. Then create Models under that Category.
+                Finally create Part / Items under a Model. These master values will
+                automatically appear in the Inventory dropdowns.
+            </div>
 
-            <!-- TODAY PURCHASES -->
+            <div class="master-grid">
 
-            <div class="summary-card purchases">
+                <!-- CATEGORY MASTER -->
+                <div class="master-panel">
+                    <h3>Categories</h3>
+                    <p>Example: Mobile, Accessories</p>
 
-                <span class="summary-label">
-                    Today's purchases
-                </span>
+                    <form class="master-form" id="masterCategoryForm">
+                        <input
+                            type="text"
+                            id="masterCategoryName"
+                            placeholder="Category name"
+                            maxlength="50"
+                            required
+                            autocomplete="off"
+                        >
 
-                <span
-                    class="summary-value"
-                    id="sumPurchases"
-                >
-                    ₹0
-                </span>
+                        <button type="submit">
+                            Add Category
+                        </button>
+                    </form>
+                </div>
+
+                <!-- MODEL MASTER -->
+                <div class="master-panel">
+                    <h3>Models</h3>
+                    <p>Example: iPhone 17, iPhone 16, 6A</p>
+
+                    <form class="master-form" id="masterModelForm">
+                        <select id="masterModelCategory" required>
+                            <option value="">Select Category</option>
+                        </select>
+
+                        <input
+                            type="text"
+                            id="masterModelName"
+                            placeholder="Model name"
+                            maxlength="100"
+                            required
+                            autocomplete="off"
+                        >
+
+                        <button type="submit">
+                            Add Model
+                        </button>
+                    </form>
+                </div>
+
+                <!-- PART / ITEM MASTER -->
+                <div class="master-panel">
+                    <h3>Part / Items</h3>
+                    <p>Example: Display, Tempered Glass, Back Case</p>
+
+                    <form class="master-form" id="masterPartForm">
+                        <select id="masterPartCategory" required>
+                            <option value="">Select Category</option>
+                        </select>
+
+                        <select id="masterPartModel" required disabled>
+                            <option value="">Select Model</option>
+                        </select>
+
+                        <input
+                            type="text"
+                            id="masterPartName"
+                            placeholder="Part / Item name"
+                            maxlength="100"
+                            required
+                            autocomplete="off"
+                        >
+
+                        <button type="submit">
+                            Add Part / Item
+                        </button>
+                    </form>
+                </div>
 
             </div>
 
-
-            <!-- ENQUIRIES -->
-
-            <!-- <div class="summary-card enquiries">
-
-                <span class="summary-label">
-                    Enquiries this month
-                </span>
-
-                <span
-                    class="summary-value"
-                    id="sumEnquiries"
-                >
-                    0
-                </span>
-
-            </div> -->
-
-
-            <!-- MONTH SALES -->
-
-            <div class="summary-card month-sales">
-
-                <span class="summary-label">
-                    Month's sales
-                </span>
-
-                <span
-                    class="summary-value"
-                    id="sumMonthSales"
-                >
-                    ₹0
-                </span>
-
-            </div>
-
-
-            <!-- MONTH EXPENSES -->
-
-            <div class="summary-card month-expenses">
-
-                <span class="summary-label">
-                    Month's expenses
-                </span>
-
-                <span
-                    class="summary-value"
-                    id="sumMonthExpenses"
-                >
-                    ₹0
-                </span>
-
-            </div>
-
-
-            <!-- ACTIVE REPAIRS -->
-
-            <div class="summary-card repairs">
-
-                <span class="summary-label">
-                    Active repairs
-                </span>
-
-                <span
-                    class="summary-value"
-                    id="sumActiveRepairs"
-                >
-                    0
-                </span>
-
+            <!-- MASTER TABLE -->
+            <div class="master-table-wrap">
+                <table class="master-table">
+                    <thead>
+                        <tr>
+                            <th>Category</th>
+                            <th>Models</th>
+                            <th>Part / Items</th>
+                        </tr>
+                    </thead>
+                    <tbody id="masterDataBody">
+                    </tbody>
+                </table>
             </div>
 
         </section>
-
 
 
         <!-- =================================================
              SALES
         ================================================== -->
 
-        <section
-            class="ledger-card accent-sales"
-            aria-label="Sales"
+       <section id="salesSection" class="ledger-card accent-sales" aria-label="Sales">
+
+    <div class="ledger-head">
+        <h2>Sales</h2>
+        <p class="ledger-sub">Phones and accessories sold</p>
+    </div>
+
+    <form class="entry-form" id="salesForm">
+
+    <select
+        name="part_item_selector"
+        id="salesPartItem"
+    >
+        <option value="">Select Part / Item (optional)</option>
+    </select>
+
+    <input
+        type="text"
+        name="product_name"
+        placeholder="Product name (or choose Part / Item)"
+        required
+    >
+
+    <input
+        type="number"
+        name="quantity"
+        placeholder="Quantity"
+        min="1"
+        step="1"
+        value="1"
+        required
+    >
+
+    <input
+        type="number"
+        name="amount"
+        placeholder="Amount"
+        step="0.01"
+        min="0"
+        required
+    >
+
+    <label class="negative-stock-option">
+        <input
+            type="checkbox"
+            name="allow_negative_stock"
+            value="1"
         >
 
-            <div class="ledger-head">
+        <span>Allow Negative Stock</span>
+    </label>
 
-                <h2>
-                    Sales
-                </h2>
+    <button type="submit">Add sale</button>
 
-                <p class="ledger-sub">
-                    Phones and accessories sold
-                </p>
+</form>
 
-            </div>
+    <div class="sales-table">
 
+        <table>
 
-            <!-- SALES FORM -->
+            <thead>
+                <tr>
+                    <th>Product</th>
+                    <th>Quantity</th>
+                    <th>Actual Amount</th>
+                    <th>Paid Amount</th>
+                    <th>Balance</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
 
-            <form
-                class="entry-form"
-                id="salesForm"
+            <tbody id="salesBody"></tbody>
+
+            <tfoot>
+                <tr>
+                    <td colspan="3">Grand total (Paid)</td>
+                    <td id="salesGrandTotal">₹0</td>
+                    <td></td>
+                    <td></td>
+                </tr>
+            </tfoot>
+
+        </table>
+
+    </div>
+
+</section>
+
+<section class="ledger-card accent-sales" id="rechargeSection">
+
+    <div class="ledger-head">
+        <div>
+            <h2>SIM Recharge</h2>
+            <p>Recharge sales and operator balance</p>
+        </div>
+    </div>
+
+    <form id="rechargeForm" class="entry-form">
+
+        <div class="form-group">
+            <label>Customer Name</label>
+            <input
+                type="text"
+                id="rechargeCustomerName"
+                placeholder="Customer name"
             >
+        </div>
 
-                <input
-                    type="text"
-                    name="product_name"
-                    placeholder="Product name"
-                    required
-                >
+        <div class="form-group">
+            <label>Mobile Number</label>
+            <input
+                type="text"
+                id="rechargeMobile"
+                placeholder="10 digit mobile number"
+                maxlength="15"
+                required
+            >
+        </div>
 
-                <input
-                    type="number"
-                    name="amount"
-                    placeholder="Amount"
-                    step="0.01"
-                    min="0"
-                    required
-                >
+        <div class="form-group">
+            <label>Operator</label>
 
-                <input
-                    type="number"
-                    name="split_amount"
-                    placeholder="Split amount"
-                    step="0.01"
-                    min="0"
-                    value="0"
-                >
+            <select id="rechargeOperator" required>
+                <option value="">Select Operator</option>
+                <option value="Jio">Jio</option>
+                <option value="Airtel">Airtel</option>
+                <option value="Vi">Vi</option>
+                <option value="BSNL">BSNL</option>
+            </select>
+        </div>
 
-                <button type="submit">
-                    Add sale
-                </button>
+        <div class="form-group">
+            <label>Recharge Amount</label>
 
-            </form>
+            <input
+                type="number"
+                id="rechargeAmount"
+                min="1"
+                step="0.01"
+                placeholder="₹ Amount"
+                required
+            >
+        </div>
 
+        <button type="submit" class="primary-btn">
+            Add Recharge
+        </button>
 
-            <!-- SALES TABLE -->
+    </form>
 
-            <div class="sales-table">
+    <div class="recharge-balance-grid">
 
-                <table>
+        <div class="balance-card">
+            <span>Opening Balance</span>
+            <strong id="rechargeOpening">₹0</strong>
+        </div>
 
-                    <thead>
+        <div class="balance-card">
+            <span>Added Balance</span>
+            <strong id="rechargeAdded">₹0</strong>
+        </div>
 
-                        <tr>
+        <div class="balance-card">
+            <span>Recharge Sales</span>
+            <strong id="rechargeUsed">₹0</strong>
+        </div>
 
-                            <th>
-                                Product
-                            </th>
+        <div class="balance-card">
+            <span>Closing Balance</span>
+            <strong id="rechargeClosing">₹0</strong>
+        </div>
 
-                            <th>
-                                Amount
-                            </th>
+    </div>
 
-                            <th>
-                                Split
-                            </th>
+    <div class="table-wrap">
 
-                            <th>
-                                Total
-                            </th>
+        <table>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Operator</th>
+                    <th>Mobile</th>
+                    <th>Type</th>
+                    <th>Amount</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
 
-                            <th>
-                                Action
-                            </th>
+            <tbody id="rechargeTableBody"></tbody>
 
-                        </tr>
+        </table>
 
-                    </thead>
+    </div>
 
+</section>
 
-                    <tbody id="salesBody">
-                    </tbody>
+<div class="recharge-add-box">
 
+    <h3>Add Operator Balance</h3>
 
-                    <tfoot>
+    <form id="rechargeAddForm">
 
-                        <tr>
+        <div class="form-group">
+            <label>Operator</label>
 
-                            <td colspan="3">
-                                Grand total
-                            </td>
+            <select id="addRechargeOperator" required>
+                <option value="">Select Operator</option>
+                <option value="Jio">Jio</option>
+                <option value="Airtel">Airtel</option>
+                <option value="Vi">Vi</option>
+                <option value="BSNL">BSNL</option>
+            </select>
+        </div>
 
-                            <td id="salesGrandTotal">
-                                ₹0
-                            </td>
+        <div class="form-group">
+            <label>Amount</label>
 
-                            <td></td>
+            <input
+                type="number"
+                id="addRechargeAmount"
+                min="1"
+                step="0.01"
+                placeholder="₹ Amount"
+                required
+            >
+        </div>
 
-                        </tr>
+        <button type="submit" class="secondary-btn">
+            Add Balance
+        </button>
 
-                    </tfoot>
+    </form>
 
-                </table>
+    <!-- ============================================================
+     OPERATOR WALLET BALANCES
+     ============================================================ -->
 
-            </div>
+<div class="operator-wallet-section">
 
-        </section>
+    <h3 class="operator-wallet-title">
+        Available Wallet Balance
+    </h3>
+
+    <div
+        id="operatorBalanceList"
+        class="operator-balance-list"
+    ></div>
+
+</div>
+
+</div>
 
         <!-- =================================================
      PAYMENTS
 ================================================== -->
 
 <section
+    id="paymentsSection"
     class="ledger-card accent-payments"
     aria-label="Payment tracking"
 >
@@ -483,7 +986,7 @@
             type="text"
             name="reference_name"
             placeholder="Product / Reference"
-            required
+            
         >
 
         <input
@@ -626,6 +1129,7 @@
         ================================================== -->
 
         <section
+            id="expensesSection"
             class="ledger-card accent-expenses"
             aria-label="Expenses"
         >
@@ -654,7 +1158,7 @@
                     type="text"
                     name="expense_name"
                     placeholder="Expense name"
-                    required
+                    
                 >
 
                 <input
@@ -734,119 +1238,349 @@
              PURCHASES
         ================================================== -->
 
-        <section
-            class="ledger-card accent-purchases"
-            aria-label="Purchases"
+       
+<section
+    id="purchasesSection"
+    class="ledger-card accent-purchases"
+    aria-label="Purchases"
+>
+
+    <div class="ledger-head">
+
+        <h2>
+            Purchases
+        </h2>
+
+        <p class="ledger-sub">
+            Stock bought from dealers
+        </p>
+
+    </div>
+
+
+    <!-- PURCHASE FORM -->
+
+    <form
+        class="entry-form"
+        id="purchasesForm"
+    >
+
+        <input
+            type="text"
+            name="dealer_name"
+            placeholder="Dealer name"
+        
+
         >
 
-            <div class="ledger-head">
+        <input
+            type="text"
+            name="product_name"
+            placeholder="Product name"
+            required
+        >
 
-                <h2>
-                    Purchases
-                </h2>
+        <input
+            type="number"
+            name="quantity"
+            placeholder="Quantity"
+            min="1"
+            step="1"
+            value="1"
+            required
+        >
 
-                <p class="ledger-sub">
-                    Stock bought from dealers
-                </p>
+        <input
+            type="number"
+            name="amount"
+            placeholder="Amount"
+            step="0.01"
+            min="0"
+            
+        >
 
-            </div>
+        <button type="submit">
+            Add purchase
+        </button>
 
-
-            <!-- PURCHASE FORM -->
-
-            <form
-                class="entry-form"
-                id="purchasesForm"
-            >
-
-                <input
-                    type="text"
-                    name="dealer_name"
-                    placeholder="Dealer name"
-                    required
-                >
-
-                <input
-                    type="text"
-                    name="product_name"
-                    placeholder="Product name"
-                    required
-                >
-
-                <input
-                    type="number"
-                    name="amount"
-                    placeholder="Amount"
-                    step="0.01"
-                    min="0"
-                    required
-                >
-
-                <button type="submit">
-                    Add purchase
-                </button>
-
-            </form>
+    </form>
 
 
-            <!-- PURCHASE TABLE -->
+    <!-- PURCHASE TABLE -->
 
-            <div class="table-wrap">
+    <div class="table-wrap">
 
-                <table>
+        <table>
 
-                    <thead>
+            <thead>
 
-                        <tr>
+                <tr>
 
-                            <th>
-                                Dealer
-                            </th>
+                    <th>
+                        Dealer
+                    </th>
 
-                            <th>
-                                Product
-                            </th>
+                    <th>
+                        Product
+                    </th>
 
-                            <th>
-                                Amount
-                            </th>
+                    <th>
+                        Quantity
+                    </th>
 
-                            <th>
-                                Action
-                            </th>
+                    <th>
+                        Amount
+                    </th>
 
-                        </tr>
+                    <th>
+                        Action
+                    </th>
 
-                    </thead>
+                </tr>
+
+            </thead>
 
 
-                    <tbody id="purchasesBody">
-                    </tbody>
+            <tbody id="purchasesBody">
+            </tbody>
 
 
-                    <tfoot>
+            <tfoot>
 
-                        <tr>
+                <tr>
 
-                            <td colspan="2">
-                                Total purchases
-                            </td>
+                    <td colspan="3">
+                        Total purchases
+                    </td>
 
-                            <td id="purchasesGrandTotal">
-                                ₹0
-                            </td>
+                    <td id="purchasesGrandTotal">
+                        ₹0
+                    </td>
 
-                            <td></td>
+                    <td></td>
 
-                        </tr>
+                </tr>
 
-                    </tfoot>
+            </tfoot>
 
-                </table>
+        </table>
 
-            </div>
+    </div>
 
-        </section>
+</section>
+
+
+
+        <!-- =================================================
+     INVENTORY MANAGEMENT
+================================================== -->
+
+<section
+    id="inventorySection"
+    class="ledger-card accent-inventory"
+    aria-label="Inventory management"
+>
+
+    <div class="ledger-head">
+
+        <h2>
+            Inventory Management
+        </h2>
+
+        <p class="ledger-sub">
+            Manage mobile phones and accessories stock
+        </p>
+
+    </div>
+
+
+    <!-- INVENTORY FORM -->
+
+    <form
+        class="entry-form inventory-form"
+        id="inventoryForm"
+    >
+
+        <!-- PRODUCT NAME -->
+        <input
+            type="text"
+            name="product_name"
+            placeholder="Product name"
+            required
+            autocomplete="off"
+        >
+
+        <!-- CATEGORY -->
+        <select
+            name="category"
+            id="inventoryCategory"
+            required
+        >
+            <option value="">Select Category</option>
+            <option value="iPhone">iPhone</option>
+            <option value="Samsung">Samsung</option>
+            <option value="Redmi">Redmi</option>
+            <option value="Realme">Realme</option>
+            <option value="Vivo">Vivo</option>
+            <option value="Oppo">Oppo</option>
+            <option value="OnePlus">OnePlus</option>
+            <option value="Motorola">Motorola</option>
+            <option value="Nokia">Nokia</option>
+            <option value="Accessories">Accessories</option>
+            <option value="Other">Other</option>
+        </select>
+
+        <!-- MODEL -->
+        <select
+            name="model"
+            id="inventoryModel"
+            required
+            disabled
+        >
+            <option value="">Select Model</option>
+        </select>
+
+        <!-- PART / ITEM -->
+        <select
+            name="part_item"
+            id="inventoryPartItem"
+            required
+            disabled
+        >
+            <option value="">Select Part / Item</option>
+        </select>
+
+        <!-- QUANTITY -->
+        <input
+            type="number"
+            name="quantity"
+            placeholder="Quantity"
+            min="0"
+            value="1"
+            step="1"
+            required
+        >
+
+        <!-- PURCHASE AMOUNT -->
+        <input
+            type="number"
+            name="purchase_price"
+            placeholder="Purchase amount"
+            step="0.01"
+            min="0"
+            value="0"
+            required
+        >
+
+        <!-- SELLING AMOUNT -->
+        <input
+            type="number"
+            name="selling_price"
+            placeholder="Selling amount"
+            step="0.01"
+            min="0"
+            value="0"
+            required
+        >
+
+        <button type="submit">
+            Add Stock
+        </button>
+
+    </form>
+
+    <!-- =====================================================
+         INVENTORY SEARCH / SORT
+    ====================================================== -->
+
+    <div class="inventory-controls">
+
+        <input
+            type="search"
+            id="inventorySearch"
+            placeholder="Search product..."
+            autocomplete="off"
+        >
+
+        <select id="inventorySort">
+
+            <option value="az">
+                Product A → Z
+            </option>
+
+            <option value="za">
+                Product Z → A
+            </option>
+
+            <option value="newest">
+                Newest First
+            </option>
+
+            <option value="oldest">
+                Oldest First
+            </option>
+
+        </select>
+
+    </div>
+
+    
+
+
+    <!-- INVENTORY TABLE -->
+
+    <div class="inventory-table-scroll">
+
+        <table>
+
+            <thead>
+
+                <tr>
+
+                    <th>Product Name</th>
+                    <th>Category</th>
+                    <th>Model</th>
+                    <th>Part / Item</th>
+                    <th>Purchase</th>
+                    <th>Selling</th>
+                    <th>Qty</th>
+                    <th>Status</th>
+                    <th>Action</th>
+
+                </tr>
+
+            </thead>
+
+
+            <tbody id="inventoryBody">
+            </tbody>
+
+
+            <tfoot>
+
+                <tr>
+
+                    <td colspan="6">
+                        TOTAL STOCK
+                    </td>
+
+                    <td id="inventoryTotalQuantity">
+                        0
+                    </td>
+
+                    <td colspan="2"></td>
+
+                </tr>
+
+            </tfoot>
+
+        </table>
+
+    </div>
+
+    </div>
+
+</section>
 
 
 
@@ -854,87 +1588,115 @@
              CUSTOMER ENQUIRIES
         ================================================== -->
 
-        <section
-            class="ledger-card accent-enquiries"
-            aria-label="Customer enquiries"
+       <!-- =================================================
+     CUSTOMER ENQUIRIES
+================================================== -->
+
+<section
+    id="enquiriesSection"
+    class="ledger-card accent-enquiries"
+    aria-label="Customer enquiries"
+>
+
+    <div class="ledger-head">
+
+        <h2>
+            Customer Enquiries
+        </h2>
+
+        <p class="ledger-sub">
+            Track customers interested in products
+        </p>
+
+    </div>
+
+
+    <!-- =================================================
+         ENQUIRY FORM
+    ================================================== -->
+
+    <form
+        class="entry-form"
+        id="enquiriesForm"
+    >
+
+        <!-- CUSTOMER NAME -->
+
+        <input
+            type="text"
+            name="customer_name"
+            placeholder="Customer name"
+            required
         >
 
-            <div class="ledger-head">
 
-                <h2>
-                    Customer enquiries
-                </h2>
+        <!-- CUSTOMER NUMBER -->
 
-                <p class="ledger-sub">
-                    People interested in a product
-                </p>
-
-            </div>
+        <input
+            type="text"
+            name="customer_number"
+            placeholder="Customer number"
+        >
 
 
-            <!-- ENQUIRY FORM -->
+        <!-- CUSTOMER ENQUIRY -->
 
-            <form
-                class="entry-form"
-                id="enquiriesForm"
-            >
-
-                <input
-                    type="text"
-                    name="customer_name"
-                    placeholder="Customer name"
-                    required
-                >
-
-                <input
-                    type="text"
-                    name="product_name"
-                    placeholder="Product name"
-                    required
-                >
-
-                <button type="submit">
-                    Add enquiry
-                </button>
-
-            </form>
+        <input
+            type="text"
+            name="customer_enquiry"
+            placeholder="Customer enquiry"
+            required
+        >
 
 
-            <!-- ENQUIRY TABLE -->
+        <button type="submit">
+            Add enquiry
+        </button>
 
-            <div class="table-wrap">
-
-                <table>
-
-                    <thead>
-
-                        <tr>
-
-                            <th>
-                                Customer
-                            </th>
-
-                            <th>
-                                Product
-                            </th>
-
-                            <th>
-                                Action
-                            </th>
-
-                        </tr>
-
-                    </thead>
+    </form>
 
 
-                    <tbody id="enquiriesBody">
-                    </tbody>
+    <!-- =================================================
+         ENQUIRY TABLE
+    ================================================== -->
 
-                </table>
+    <div class="table-wrap">
 
-            </div>
+        <table>
 
-        </section>
+            <thead>
+
+                <tr>
+
+                    <th>
+                        Customer Name
+                    </th>
+
+                    <th>
+                        Customer Number
+                    </th>
+
+                    <th>
+                        Customer Enquiry
+                    </th>
+
+                    <th>
+                        Action
+                    </th>
+
+                </tr>
+
+            </thead>
+
+
+            <tbody id="enquiriesBody">
+            </tbody>
+
+        </table>
+
+    </div>
+
+</section>
 
 
 
@@ -942,103 +1704,323 @@
              REPAIRS
         ================================================== -->
 
-        <section
-            class="ledger-card accent-repairs"
-            aria-label="Repairs"
+        <!-- =================================================
+     REPAIRS
+================================================== -->
+
+<section
+    id="repairsSection"
+    class="ledger-card accent-repairs"
+    aria-label="Repairs"
+>
+
+    <div class="ledger-head">
+
+        <h2>
+            Repairs Tracker
+        </h2>
+
+        <p class="ledger-sub">
+            Track customer repairs, parts, advance and balance
+        </p>
+
+    </div>
+
+
+    <!-- =================================================
+         REPAIR FORM
+    ================================================== -->
+
+    <form
+        class="entry-form"
+        id="repairsForm"
+    >
+
+        <!-- CUSTOMER NAME -->
+
+        <input
+            type="text"
+            name="customer_name"
+            placeholder="Customer name"
+            required
         >
 
-            <div class="ledger-head ">
 
-                <h2>
-                    Repairs Tracker
-                </h2>
+        <!-- CUSTOMER NUMBER -->
 
-                <p class="ledger-sub">
-                    Track customer products sent for repair
-                </p>
-
-            </div>
+        <input
+            type="text"
+            name="customer_number"
+            placeholder="Customer number"
+        >
 
 
-            <!-- REPAIR FORM -->
+        <!-- PRODUCT -->
 
-            <form
-                class="entry-form"
-                id="repairsForm"
-            >
-
-                <input
-                    type="text"
-                    name="customer_name"
-                    placeholder="Customer name"
-                    required
-                    class=""
-                >
-
-                <input
-                    type="text"
-                    name="product_name"
-                    placeholder="Product name"
-                    required
-                >
-
-                <select
-                    name="status"
-                    required
-                >
-
-                    <option value="In Progress">
-                        In Progress
-                    </option>
-
-                    <option value="Completed">
-                        Completed
-                    </option>
-
-                    <option value="Delivered to Customer">
-                        Delivered to Customer
-                    </option>
-
-                </select>
+        <input
+            type="text"
+            name="product_name"
+            placeholder="Product"
+            required
+        >
 
 
-                <button type="submit">
-                    Add repair
-                </button>
+        <!-- MODEL -->
 
-            </form>
-
-
-            <!-- REPAIR TABLE -->
-
-            <!-- REPAIR TABLE -->
-
-<div class="repair-table-scroll">
-
-    <table>
+        <input
+            type="text"
+            name="model"
+            placeholder="Model"
+        >
 
 
-        <thead>
-            <tr>
-                <th>Customer</th>
-                <th>Product</th>
-                <th>Status</th>
-                <th>Action</th>
-            </tr>
-        </thead>
+        <!-- ISSUE -->
 
-        <tbody id="repairsBody">
-        </tbody>
+        <input
+            type="text"
+            name="issue"
+            placeholder="Issue"
+        >
 
-    </table>
+
+        <!-- PART / ITEM -->
+
+        <select
+            name="part_request"
+            id="repairPartItem"
+        >
+            <option value="">Select Part / Item (optional)</option>
+        </select>
+
+
+        <!-- AMOUNT -->
+
+        <input
+            type="number"
+            name="amount"
+            placeholder="Repair amount"
+            step="0.01"
+            min="0"
+            value="0"
+            required
+        >
+
+
+        <!-- ADVANCE -->
+
+        <input
+            type="number"
+            name="advance"
+            placeholder="Advance"
+            step="0.01"
+            min="0"
+            value="0"
+            required
+        >
+
+
+        <!-- STATUS -->
+
+        <select
+            name="status"
+            required
+        >
+
+            <option value="Received">
+                Received
+            </option>
+
+            <option value="In Progress">
+                In Progress
+            </option>
+
+            <option value="Completed">
+                Completed
+            </option>
+
+            <option value="Delivered to Customer">
+                Delivered to Customer
+            </option>
+
+        </select>
+
+
+        <!-- ADD BUTTON -->
+
+        <button type="submit">
+            Add repair
+        </button>
+
+    </form>
+
+    <div class="repair-filters">
+
+    <input
+        type="search"
+        id="repairSearch"
+        placeholder="Search customer, number, product, model, issue..."
+        autocomplete="off"
+    >
+
+    <select id="repairStatusFilter">
+
+        <option value="All">
+            All Status
+        </option>
+
+        <option value="Received">
+            Received
+        </option>
+
+        <option value="In Progress">
+            In Progress
+        </option>
+
+        <option value="Completed">
+            Completed
+        </option>
+
+        <option value="Delivered to Customer">
+            Delivered to Customer
+        </option>
+
+    </select>
 
 </div>
 
-        </section>
+
+    <!-- =================================================
+         REPAIR TABLE
+    ================================================== -->
+
+    <div class="repair-table-scroll">
+
+        <table>
+
+            <thead>
+
+                <tr>
+
+                    <th>
+                        Customer
+                    </th>
+
+                    <th>
+                        Customer Number
+                    </th>
+
+                    <th>
+                        Product
+                    </th>
+
+                    <th>
+                        Model
+                    </th>
+
+                    <th>
+                        Issue
+                    </th>
+
+                    <th>
+                        Part Request
+                    </th>
+
+                    <th>
+                        Amount
+                    </th>
+
+                    <th>
+                        Advance
+                    </th>
+
+                    <th>
+                        Balance
+                    </th>
+
+                    <th>
+                        Status
+                    </th>
+
+                    <th>
+                        Action
+                    </th>
+
+                </tr>
+
+            </thead>
+
+
+            <tbody id="repairsBody">
+            </tbody>
+
+
+            <tfoot>
+
+                <tr>
+
+                    <td colspan="6">
+                        Repair totals
+                    </td>
+
+                    <td id="repairsTotalAmount">
+                        ₹0
+                    </td>
+
+                    <td id="repairsTotalAdvance">
+                        ₹0
+                    </td>
+
+                    <td id="repairsTotalBalance">
+                        ₹0
+                    </td>
+
+                    <td colspan="2">
+                    </td>
+
+                </tr>
+
+            </tfoot>
+
+        </table>
+
+    </div>
+
+</section>
 
 
     </main>
 
+
+
+    <!-- =====================================================
+         REPAIR DETAILS MODAL
+    ====================================================== -->
+
+    <div
+        id="repairDetailsModal"
+        class="repair-details-modal"
+        aria-hidden="true"
+    >
+        <div
+            class="repair-details-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="repairDetailsTitle"
+        >
+            <div class="repair-details-header">
+                <h3 id="repairDetailsTitle">Repair Details</h3>
+                <button
+                    type="button"
+                    class="repair-details-close"
+                    aria-label="Close"
+                >
+                    &times;
+                </button>
+            </div>
+
+            <div id="repairDetailsContent"></div>
+        </div>
+    </div>
 
 
     <!-- =====================================================
@@ -1059,6 +2041,46 @@
     <script
         src="{{ url_for('static', filename='js/app.js') }}"
     ></script>
+    <script>
+        // ============================================================
+        // SECTION NAVIGATION
+        // ============================================================
+
+        (function () {
+            const nav = document.getElementById('sectionNavigation');
+
+            if (!nav) {
+                return;
+            }
+
+            nav.addEventListener('click', function (event) {
+                const button = event.target.closest('.section-nav-btn');
+
+                if (!button) {
+                    return;
+                }
+
+                const sectionId = button.getAttribute('data-section');
+                const section = document.getElementById(sectionId);
+
+                if (!section) {
+                    console.error('Section not found:', sectionId);
+                    return;
+                }
+
+                nav.querySelectorAll('.section-nav-btn').forEach(function (item) {
+                    item.classList.remove('active');
+                });
+
+                button.classList.add('active');
+
+                section.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start'
+                });
+            });
+        })();
+    </script>
 
 
 </body>

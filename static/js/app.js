@@ -1,4 +1,3 @@
-
 // ============================================================
 // SHOP LEDGER - COMPLETE APP.JS
 // ============================================================
@@ -73,6 +72,78 @@ if (monthInput) {
 
 
 // ============================================================
+// FORM ELEMENTS
+// ============================================================
+
+const salesForm =
+    document.getElementById('salesForm');
+
+const salesPartItem =
+    document.getElementById('salesPartItem');
+
+const repairPartItem =
+    document.getElementById('repairPartItem');
+
+// Negative stock checkbox.
+// Always start OFF when the page loads.
+const negativeStockCheckbox =
+    document.querySelector(
+        '#salesForm input[name="allow_negative_stock"]'
+    );
+
+if (negativeStockCheckbox) {
+    negativeStockCheckbox.checked = false;
+}
+
+
+const expensesForm =
+    document.getElementById('expensesForm');
+
+
+const purchasesForm =
+    document.getElementById('purchasesForm');
+
+
+const inventoryForm =
+    document.getElementById('inventoryForm');
+
+
+const enquiriesForm =
+    document.getElementById('enquiriesForm');
+
+
+const repairsForm =
+    document.getElementById('repairsForm');
+
+
+const paymentsForm =
+    document.getElementById('paymentsForm');
+
+
+// ============================================================
+// INVENTORY SEARCH
+// ============================================================
+
+let inventoryData = [];
+
+
+const inventorySearch =
+    document.getElementById('inventorySearch');
+
+
+const inventoryCategory =
+    document.getElementById('inventoryCategory');
+
+
+const inventoryModel =
+    document.getElementById('inventoryModel');
+
+
+const inventoryPartItem =
+    document.getElementById('inventoryPartItem');
+
+
+// ============================================================
 // FILTER QUERY
 // ============================================================
 
@@ -117,7 +188,6 @@ async function api(path, options = {}) {
             try {
 
                 const body = await res.json();
-
 
                 if (body && body.error) {
 
@@ -252,6 +322,68 @@ const REPAIR_STATUSES = [
 
 
 // ============================================================
+// REPAIR SEARCH & FILTER DATA
+// ============================================================
+
+let repairData = [];
+
+
+const repairSearch =
+    document.getElementById('repairSearch');
+
+
+const repairStatusFilter =
+    document.getElementById('repairStatusFilter');
+
+// ============================================================
+// DASHBOARD CARD VIEW
+// ============================================================
+
+function updateDashboardCards() {
+
+    const dayCards =
+        document.getElementById(
+            'dashboardDayCards'
+        );
+
+
+    const monthCards =
+        document.getElementById(
+            'dashboardMonthCards'
+        );
+
+
+    if (!dayCards || !monthCards) {
+
+        console.warn(
+            'Dashboard card containers not found.'
+        );
+
+        return;
+
+    }
+
+
+    if (state.view === 'month') {
+
+        dayCards.style.display = 'none';
+
+        monthCards.style.display = 'grid';
+
+    }
+
+    else {
+
+        dayCards.style.display = 'grid';
+
+        monthCards.style.display = 'none';
+
+    }
+
+}
+
+
+// ============================================================
 // SALES - LOAD
 // ============================================================
 
@@ -263,107 +395,150 @@ async function loadSales() {
             `/api/sales?${currentFilterQuery()}`
         );
 
-
         const body =
             document.getElementById('salesBody');
 
-
         if (!body) {
-
             return;
-
         }
-
 
         body.innerHTML = '';
 
-
         let grandTotal = 0;
-
 
         if (!Array.isArray(rows) || rows.length === 0) {
 
             body.innerHTML = `
-
                 <tr class="empty-row">
-
-                    <td colspan="5">
+                    <td colspan="6">
                         No sales recorded yet.
                     </td>
-
                 </tr>
-
             `;
-
 
             const totalEl =
                 document.getElementById(
                     'salesGrandTotal'
                 );
 
-
             if (totalEl) {
-
                 totalEl.textContent = fmt(0);
-
             }
 
-
             return;
-
         }
-
 
         rows.forEach((r) => {
 
-            const total =
+            const quantity =
+                Number(r.quantity) || 0;
+
+            const amount =
+                Number(r.amount) || 0;
+
+            const actualAmount =
+                Number(r.actual_amount) || amount;
+
+            const paidAmount =
                 Number(r.total_amount) || 0;
 
+            const saleType =
+                String(r.sale_type || 'Product');
 
-            grandTotal += total;
+            const repairId =
+                Number(r.repair_id) || 0;
 
+            const repairBalance =
+                saleType === 'Repair'
+                    ? Number(r.repair_balance) || 0
+                    : 0;
+
+            grandTotal += paidAmount;
 
             const tr =
                 document.createElement('tr');
 
-
             tr.innerHTML = `
-
                 <td>
                     ${escapeHtml(r.product_name)}
                 </td>
 
                 <td>
-                    ${fmt(r.amount)}
+                    ${quantity}
                 </td>
 
                 <td>
-                    ${fmt(r.split_amount)}
+                    ${fmt(actualAmount)}
                 </td>
 
                 <td>
-                    ${fmt(r.total_amount)}
+                    ${fmt(paidAmount)}
                 </td>
 
                 <td>
-
-                    <button
-                        type="button"
-                        class="row-delete"
-                    >
-                        Delete
-                    </button>
-
+                    ${fmt(repairBalance)}
                 </td>
 
+                <td class="sales-actions"></td>
             `;
 
+            const actionCell =
+                tr.querySelector('.sales-actions');
 
-            const deleteButton =
-                tr.querySelector('.row-delete');
+            // -------------------------------------------------
+            // REPAIR SALE
+            // -------------------------------------------------
+            // Show Edit Balance only while money is still due.
 
+            if (
+                saleType === 'Repair' &&
+                repairId
+            ) {
 
-            if (deleteButton) {
+                const editButton =
+                    document.createElement('button');
+
+                editButton.type = 'button';
+                editButton.className = 'row-edit';
+
+                if (repairBalance > 0) {
+
+                    editButton.textContent =
+                        'Edit Balance';
+
+                    editButton.addEventListener(
+                        'click',
+                        async () => {
+                            await editRepairBalance(r);
+                        }
+                    );
+
+                } else {
+
+                    editButton.textContent =
+                        'Paid';
+
+                    editButton.disabled = true;
+                    editButton.title =
+                        'This repair is fully paid';
+                }
+
+                if (actionCell) {
+                    actionCell.appendChild(editButton);
+                }
+
+            } else {
+
+                // -------------------------------------------------
+                // NORMAL PRODUCT SALE
+                // -------------------------------------------------
+
+                const deleteButton =
+                    document.createElement('button');
+
+                deleteButton.type = 'button';
+                deleteButton.className = 'row-delete';
+                deleteButton.textContent = 'Delete';
 
                 deleteButton.addEventListener(
                     'click',
@@ -371,14 +546,11 @@ async function loadSales() {
 
                         if (
                             !confirm(
-                                'Delete this sale?'
+                                'Delete this sale? Stock will be restored.'
                             )
                         ) {
-
                             return;
-
                         }
-
 
                         try {
 
@@ -389,53 +561,43 @@ async function loadSales() {
                                 }
                             );
 
-
                             toast(
-                                'Sale deleted'
+                                'Sale deleted and stock restored'
                             );
 
-
                             await loadSales();
-
+                            await loadInventory();
                             await loadSummary();
-
 
                         } catch (err) {
 
                             console.error(err);
 
-
                             toast(
                                 err.message,
                                 true
                             );
-
                         }
-
                     }
                 );
 
+                if (actionCell) {
+                    actionCell.appendChild(deleteButton);
+                }
             }
 
-
             body.appendChild(tr);
-
         });
-
 
         const totalEl =
             document.getElementById(
                 'salesGrandTotal'
             );
 
-
         if (totalEl) {
-
             totalEl.textContent =
                 fmt(grandTotal);
-
         }
-
 
     } catch (err) {
 
@@ -444,24 +606,256 @@ async function loadSales() {
             err
         );
 
-
         toast(
             'Could not load sales: ' +
             err.message,
             true
         );
-
     }
 
 }
 
 
 // ============================================================
+// REPAIR SALE - ADD BALANCE PAYMENT
+// ============================================================
+
+async function editRepairBalance(repairSale) {
+
+    const currentBalance =
+        Number(repairSale.repair_balance) || 0;
+
+    if (currentBalance <= 0) {
+        toast(
+            'This repair is already fully paid.'
+        );
+        return;
+    }
+
+    const input = window.prompt(
+        `Remaining repair balance: ${fmt(currentBalance)}\n\n` +
+        'Enter the balance amount received now:',
+        currentBalance.toFixed(2)
+    );
+
+    if (input === null) {
+        return;
+    }
+
+    const paymentAmount =
+        Number(String(input).trim());
+
+    if (
+        !Number.isFinite(paymentAmount) ||
+        paymentAmount <= 0
+    ) {
+        toast(
+            'Please enter a valid payment amount.',
+            true
+        );
+        return;
+    }
+
+    if (paymentAmount > currentBalance) {
+        toast(
+            `Payment cannot be greater than the remaining balance of ${fmt(currentBalance)}.`,
+            true
+        );
+        return;
+    }
+
+    try {
+
+        const result = await api(
+            `/api/repairs/${repairSale.repair_id}/balance-payment`,
+            {
+                method: 'POST',
+                body: JSON.stringify({
+                    payment_amount: paymentAmount
+                })
+            }
+        );
+
+        toast(
+            `Balance payment recorded. Remaining: ${fmt(result.balance)}`
+        );
+
+        await Promise.all([
+            loadSales(),
+            loadRepairs(),
+            loadSummary()
+        ]);
+
+    } catch (err) {
+
+        console.error(
+            'Repair balance payment error:',
+            err
+        );
+
+        toast(
+            err.message,
+            true
+        );
+    }
+}
+
+// ============================================================
 // SALES - ADD
 // ============================================================
 
-const salesForm =
-    document.getElementById('salesForm');
+
+// ============================================================
+// SALES / REPAIR - PART / ITEM DROPDOWNS
+// ============================================================
+
+function getInventoryPartOptions() {
+
+    if (!Array.isArray(inventoryData)) {
+        return [];
+    }
+
+    const seen = new Set();
+    const options = [];
+
+    inventoryData.forEach((item) => {
+
+        const productName =
+            String(item.product_name || '').trim();
+
+        if (!productName) {
+            return;
+        }
+
+        if (seen.has(productName.toLowerCase())) {
+            return;
+        }
+
+        seen.add(productName.toLowerCase());
+
+        const partItem =
+            String(item.part_item || '').trim();
+
+        const model =
+            String(item.model || '').trim();
+
+        const category =
+            String(item.category || '').trim();
+
+        let label = partItem || productName;
+
+        if (model) {
+            label += ` — ${model}`;
+        }
+
+        if (category) {
+            label += ` — ${category}`;
+        }
+
+        if (productName.toLowerCase() !== label.toLowerCase()) {
+            label += ` — ${productName}`;
+        }
+
+        options.push({
+            value: productName,
+            label
+        });
+    });
+
+    options.sort((a, b) =>
+        a.label.localeCompare(b.label, undefined, {
+            sensitivity: 'base'
+        })
+    );
+
+    return options;
+}
+
+
+function populateSalesPartItemOptions(selectedProduct = '') {
+
+    if (!salesPartItem) {
+        return;
+    }
+
+    salesPartItem.innerHTML =
+        '<option value="">Select Part / Item (optional)</option>';
+
+    getInventoryPartOptions().forEach((item) => {
+
+        const option = document.createElement('option');
+
+        option.value = item.value;
+        option.textContent = item.label;
+        option.selected =
+            item.value === selectedProduct;
+
+        salesPartItem.appendChild(option);
+    });
+
+    salesPartItem.disabled =
+        getInventoryPartOptions().length === 0;
+}
+
+
+function populateRepairPartItemOptions(selectedProduct = '') {
+
+    if (!repairPartItem) {
+        return;
+    }
+
+    repairPartItem.innerHTML =
+        '<option value="">Select Part / Item (optional)</option>';
+
+    getInventoryPartOptions().forEach((item) => {
+
+        const option = document.createElement('option');
+
+        option.value = item.value;
+        option.textContent = item.label;
+        option.selected =
+            item.value === selectedProduct;
+
+        repairPartItem.appendChild(option);
+    });
+
+    repairPartItem.disabled =
+        getInventoryPartOptions().length === 0;
+}
+
+
+if (salesPartItem) {
+
+    salesPartItem.addEventListener('change', () => {
+
+        const productInput =
+            salesForm
+                ? salesForm.elements['product_name']
+                : null;
+
+        if (productInput && salesPartItem.value) {
+            productInput.value = salesPartItem.value;
+            productInput.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+    });
+}
+
+
+if (repairPartItem) {
+
+    repairPartItem.addEventListener('change', () => {
+
+        const productInput =
+            repairsForm
+                ? repairsForm.elements['product_name']
+                : null;
+
+        if (productInput && repairPartItem.value) {
+            // Keep the repair product/model fields available for customer details.
+            // Only the requested inventory part is selected here.
+        }
+    });
+}
 
 
 if (salesForm) {
@@ -472,42 +866,50 @@ if (salesForm) {
 
             e.preventDefault();
 
-
             const f = e.target;
 
+            const selectedPartItem =
+                f.elements['part_item_selector']
+                    ? f.elements['part_item_selector'].value.trim()
+                    : '';
+
+            const productInput =
+                f.elements['product_name'];
+
+            const productName =
+                productInput.value.trim() ||
+                selectedPartItem;
+
+            const quantity =
+                Number(
+                    f.elements['quantity'].value
+                );
 
             const amount =
-                Number(f.amount.value) || 0;
+                Number(
+                    f.elements['amount'].value
+                );
 
+            // IMPORTANT:
+            // Negative stock is allowed ONLY when the
+            // checkbox is actually checked.
+            const negativeStockInput =
+                f.elements['allow_negative_stock'];
 
-            const splitAmount =
-                Number(f.split_amount.value) || 0;
+            const allowNegativeStock =
+                negativeStockInput
+                    ? negativeStockInput.checked === true
+                    : false;
 
+            console.log(
+                'Allow Negative Stock:',
+                allowNegativeStock
+            );
 
-            const payload = {
-
-                sale_date:
-                    state.date,
-
-                product_name:
-                    f.product_name.value.trim(),
-
-                amount:
-                    amount,
-
-                split_amount:
-                    splitAmount,
-
-                total_amount:
-                    amount + splitAmount
-
-            };
-
-
-            if (!payload.product_name) {
+            if (!productName) {
 
                 toast(
-                    'Enter product name',
+                    'Please enter product name',
                     true
                 );
 
@@ -515,6 +917,106 @@ if (salesForm) {
 
             }
 
+            if (
+                !Number.isInteger(quantity) ||
+                quantity <= 0
+            ) {
+
+                toast(
+                    'Quantity must be greater than 0',
+                    true
+                );
+
+                return;
+
+            }
+
+            if (
+                !Number.isFinite(amount) ||
+                amount < 0
+            ) {
+
+                toast(
+                    'Please enter a valid amount',
+                    true
+                );
+
+                return;
+
+            }
+
+            // ----------------------------------------------------
+            // FRONTEND SAFETY CHECK
+            //
+            // When the checkbox is OFF, do not allow the sale
+            // to continue if current inventory is insufficient.
+            // The backend must also enforce this rule.
+            // ----------------------------------------------------
+
+            if (!allowNegativeStock) {
+
+                const matchingItem =
+                    inventoryData.find(
+                        (item) =>
+                            String(
+                                item.product_name || ''
+                            )
+                                .trim()
+                                .toLowerCase() ===
+                            productName
+                                .trim()
+                                .toLowerCase()
+                    );
+
+                if (matchingItem) {
+
+                    const currentStock =
+                        Number(
+                            matchingItem.quantity
+                        ) || 0;
+
+                    if (currentStock < quantity) {
+
+                        toast(
+                            `Insufficient stock for "${productName}". ` +
+                            `Available: ${currentStock}, ` +
+                            `Required: ${quantity}. ` +
+                            `Tick "Allow Negative Stock" to continue.`,
+                            true
+                        );
+
+                        return;
+
+                    }
+
+                }
+
+            }
+
+            const payload = {
+
+                sale_date:
+                    state.date,
+
+                product_name:
+                    productName,
+
+                quantity:
+                    quantity,
+
+                amount:
+                    amount,
+
+                // This will ALWAYS be a real Boolean.
+                allow_negative_stock:
+                    allowNegativeStock
+
+            };
+
+            console.log(
+                'Sale payload:',
+                payload
+            );
 
             try {
 
@@ -530,19 +1032,42 @@ if (salesForm) {
                     }
                 );
 
-
                 f.reset();
 
+                // Always return the checkbox to OFF
+                // after a successful sale.
+                if (
+                    f.elements[
+                        'allow_negative_stock'
+                    ]
+                ) {
+
+                    f.elements[
+                        'allow_negative_stock'
+                    ].checked = false;
+
+                }
+
+                if (
+                    f.elements['quantity']
+                ) {
+
+                    f.elements['quantity'].value =
+                        1;
+
+                }
+
+                populateSalesPartItemOptions();
 
                 toast(
                     'Sale added successfully'
                 );
 
-
                 await loadSales();
 
-                await loadSummary();
+                await loadInventory();
 
+                await loadSummary();
 
             } catch (err) {
 
@@ -550,7 +1075,6 @@ if (salesForm) {
                     'Add sale error:',
                     err
                 );
-
 
                 toast(
                     err.message,
@@ -625,7 +1149,6 @@ async function loadExpenses() {
 
             }
 
-
             return;
 
         }
@@ -651,7 +1174,7 @@ async function loadExpenses() {
                 </td>
 
                 <td>
-                    ${fmt(r.amount)}
+                    ${fmt(amount)}
                 </td>
 
                 <td>
@@ -768,12 +1291,6 @@ async function loadExpenses() {
 // ============================================================
 // EXPENSES - ADD
 // ============================================================
-
-const expensesForm =
-    document.getElementById(
-        'expensesForm'
-    );
-
 
 if (expensesForm) {
 
@@ -900,7 +1417,7 @@ async function loadPurchases() {
 
                 <tr class="empty-row">
 
-                    <td colspan="4">
+                    <td colspan="5">
                         No purchases recorded yet.
                     </td>
 
@@ -922,7 +1439,6 @@ async function loadPurchases() {
 
             }
 
-
             return;
 
         }
@@ -932,6 +1448,10 @@ async function loadPurchases() {
 
             const amount =
                 Number(r.amount) || 0;
+
+
+            const quantity =
+                Number(r.quantity) || 0;
 
 
             grandTotal += amount;
@@ -952,7 +1472,11 @@ async function loadPurchases() {
                 </td>
 
                 <td>
-                    ${fmt(r.amount)}
+                    ${quantity}
+                </td>
+
+                <td>
+                    ${fmt(amount)}
                 </td>
 
                 <td>
@@ -981,7 +1505,7 @@ async function loadPurchases() {
 
                         if (
                             !confirm(
-                                'Delete this purchase?'
+                                'Delete this purchase? Stock will be reduced.'
                             )
                         ) {
 
@@ -1001,11 +1525,13 @@ async function loadPurchases() {
 
 
                             toast(
-                                'Purchase deleted'
+                                'Purchase deleted and stock adjusted'
                             );
 
 
                             await loadPurchases();
+
+                            await loadInventory();
 
                             await loadSummary();
 
@@ -1070,12 +1596,6 @@ async function loadPurchases() {
 // PURCHASES - ADD
 // ============================================================
 
-const purchasesForm =
-    document.getElementById(
-        'purchasesForm'
-    );
-
-
 if (purchasesForm) {
 
     purchasesForm.addEventListener(
@@ -1088,6 +1608,10 @@ if (purchasesForm) {
             const f = e.target;
 
 
+            const quantity =
+                Number(f.quantity.value) || 0;
+
+
             const payload = {
 
                 purchase_date:
@@ -1098,6 +1622,9 @@ if (purchasesForm) {
 
                 product_name:
                     f.product_name.value.trim(),
+
+                quantity:
+                    quantity,
 
                 amount:
                     Number(f.amount.value) || 0
@@ -1121,6 +1648,21 @@ if (purchasesForm) {
 
                 toast(
                     'Enter product name',
+                    true
+                );
+
+                return;
+
+            }
+
+
+            if (
+                !Number.isInteger(payload.quantity) ||
+                payload.quantity <= 0
+            ) {
+
+                toast(
+                    'Quantity must be greater than 0',
                     true
                 );
 
@@ -1154,6 +1696,8 @@ if (purchasesForm) {
 
                 await loadPurchases();
 
+                await loadInventory();
+
                 await loadSummary();
 
 
@@ -1175,6 +1719,1471 @@ if (purchasesForm) {
         }
     );
 
+}
+
+
+// ============================================================
+// INVENTORY STOCK ALERTS
+// ============================================================
+
+function renderInventoryAlerts() {
+
+    if (!Array.isArray(inventoryData)) {
+        return;
+    }
+
+    let alertContainer =
+        document.getElementById(
+            'inventoryStockAlerts'
+        );
+
+    if (!alertContainer) {
+
+        alertContainer =
+            document.createElement('div');
+
+        alertContainer.id =
+            'inventoryStockAlerts';
+
+        alertContainer.className =
+            'inventory-stock-alerts';
+
+        const inventoryBody =
+            document.getElementById(
+                'inventoryBody'
+            );
+
+        if (inventoryBody) {
+
+            const table =
+                inventoryBody.closest('table');
+
+            if (table && table.parentElement) {
+
+                table.parentElement.insertBefore(
+                    alertContainer,
+                    table
+                );
+
+            } else if (
+                inventorySearch &&
+                inventorySearch.parentElement
+            ) {
+
+                inventorySearch.parentElement.insertBefore(
+                    alertContainer,
+                    inventorySearch
+                );
+            }
+        }
+    }
+
+    const stockShortage =
+        inventoryData.filter(
+            (item) => Number(item.quantity) < 0
+        );
+
+    const outOfStock =
+        inventoryData.filter(
+            (item) => Number(item.quantity) === 0
+        );
+
+    const lowStock =
+        inventoryData.filter((item) => {
+            const quantity = Number(item.quantity);
+            return quantity > 0 && quantity <= 2;
+        });
+
+    const totalAlerts =
+        stockShortage.length +
+        outOfStock.length +
+        lowStock.length;
+
+    if (totalAlerts === 0) {
+
+        alertContainer.innerHTML = `
+            <div class="inventory-alert-header">
+                <strong>Inventory Stock Status</strong>
+            </div>
+
+            <div class="inventory-all-good">
+                ✓ All products have sufficient stock.
+            </div>
+        `;
+
+        return;
+    }
+
+    function productList(items) {
+
+        if (items.length === 0) {
+            return '<div class="inventory-alert-empty">None</div>';
+        }
+
+        return `
+            <div class="inventory-alert-products">
+                ${items.map((item) => {
+
+                    const name = escapeHtml(
+                        item.product_name ||
+                        'Unnamed Product'
+                    );
+
+                    const quantity =
+                        Number(item.quantity) || 0;
+
+                    return `
+                        <div class="inventory-alert-product">
+                            <span>${name}</span>
+                            <strong>${quantity}</strong>
+                        </div>
+                    `;
+
+                }).join('')}
+            </div>
+        `;
+    }
+
+    alertContainer.innerHTML = `
+        <div class="inventory-alert-header">
+            <div>
+                <strong>Inventory Stock Alerts</strong>
+                <span class="inventory-alert-count">
+                    ${totalAlerts} product${totalAlerts === 1 ? '' : 's'}
+                </span>
+            </div>
+        </div>
+
+        <div class="inventory-alert-grid">
+
+            <div class="inventory-alert-card shortage">
+                <div class="inventory-alert-card-title">
+                    Stock Shortage
+                </div>
+
+                <div class="inventory-alert-card-count">
+                    ${stockShortage.length}
+                </div>
+
+                ${productList(stockShortage)}
+            </div>
+
+            <div class="inventory-alert-card out">
+                <div class="inventory-alert-card-title">
+                    Out of Stock
+                </div>
+
+                <div class="inventory-alert-card-count">
+                    ${outOfStock.length}
+                </div>
+
+                ${productList(outOfStock)}
+            </div>
+
+            <div class="inventory-alert-card low">
+                <div class="inventory-alert-card-title">
+                    Low Stock
+                </div>
+
+                <div class="inventory-alert-card-count">
+                    ${lowStock.length}
+                </div>
+
+                ${productList(lowStock)}
+            </div>
+
+        </div>
+    `;
+}
+
+
+// ============================================================
+// MASTER DATA
+// ============================================================
+
+let masterCategories = [];
+let masterModels = [];
+let masterParts = [];
+
+const masterCategoryForm =
+    document.getElementById('masterCategoryForm');
+
+const masterCategoryName =
+    document.getElementById('masterCategoryName');
+
+const masterModelForm =
+    document.getElementById('masterModelForm');
+
+const masterModelCategory =
+    document.getElementById('masterModelCategory');
+
+const masterModelName =
+    document.getElementById('masterModelName');
+
+const masterPartForm =
+    document.getElementById('masterPartForm');
+
+const masterPartCategory =
+    document.getElementById('masterPartCategory');
+
+const masterPartModel =
+    document.getElementById('masterPartModel');
+
+const masterPartName =
+    document.getElementById('masterPartName');
+
+
+function populateMasterCategorySelect(selectElement, selectedId = '') {
+
+    if (!selectElement) {
+        return;
+    }
+
+    selectElement.innerHTML =
+        '<option value="">Select Category</option>';
+
+    masterCategories.forEach((category) => {
+
+        const option = document.createElement('option');
+
+        option.value = String(category.id);
+        option.textContent = category.name;
+        option.selected =
+            String(category.id) === String(selectedId);
+
+        selectElement.appendChild(option);
+    });
+}
+
+
+function populateMasterModelSelect(
+    selectElement,
+    categoryId,
+    selectedId = ''
+) {
+
+    if (!selectElement) {
+        return;
+    }
+
+    selectElement.innerHTML =
+        '<option value="">Select Model</option>';
+
+    const filteredModels =
+        masterModels.filter((model) =>
+            String(model.category_id) === String(categoryId)
+        );
+
+    filteredModels.forEach((model) => {
+
+        const option = document.createElement('option');
+
+        option.value = String(model.id);
+        option.textContent = model.name;
+        option.selected =
+            String(model.id) === String(selectedId);
+
+        selectElement.appendChild(option);
+    });
+
+    selectElement.disabled =
+        filteredModels.length === 0;
+}
+
+
+function populateInventoryCategoryOptions(selectedValue = '') {
+
+    if (!inventoryCategory) {
+        return;
+    }
+
+    inventoryCategory.innerHTML =
+        '<option value="">Select Category</option>';
+
+    masterCategories.forEach((category) => {
+
+        const option = document.createElement('option');
+
+        option.value = category.name;
+        option.textContent = category.name;
+        option.selected =
+            category.name === selectedValue;
+
+        inventoryCategory.appendChild(option);
+    });
+
+    inventoryCategory.disabled =
+        masterCategories.length === 0;
+}
+
+
+function populateInventoryModelOptions(categoryName, selectedModel = '') {
+
+    const category =
+        masterCategories.find(
+            (item) => item.name === categoryName
+        );
+
+    const categoryId =
+        category ? category.id : '';
+
+    if (inventoryModel) {
+
+        inventoryModel.innerHTML =
+            '<option value="">Select Model</option>';
+
+        const filteredModels =
+            masterModels.filter((model) =>
+                String(model.category_id) === String(categoryId)
+            );
+
+        filteredModels.forEach((model) => {
+
+            const option = document.createElement('option');
+
+            option.value = model.name;
+            option.textContent = model.name;
+            option.selected =
+                model.name === selectedModel;
+
+            inventoryModel.appendChild(option);
+        });
+
+        inventoryModel.disabled =
+            filteredModels.length === 0;
+    }
+
+    if (inventoryPartItem) {
+
+        inventoryPartItem.innerHTML =
+            '<option value="">Select Part / Item</option>';
+
+        inventoryPartItem.disabled = true;
+    }
+}
+
+
+function populateInventoryPartOptions(
+    categoryName,
+    modelName,
+    selectedPart = ''
+) {
+
+    if (!inventoryPartItem) {
+        return;
+    }
+
+    const category =
+        masterCategories.find(
+            (item) => item.name === categoryName
+        );
+
+    const categoryId =
+        category ? category.id : '';
+
+    const model =
+        masterModels.find((item) =>
+            String(item.category_id) === String(categoryId) &&
+            item.name === modelName
+        );
+
+    const modelId =
+        model ? model.id : '';
+
+    inventoryPartItem.innerHTML =
+        '<option value="">Select Part / Item</option>';
+
+    const filteredParts =
+        masterParts.filter((part) =>
+            String(part.model_id) === String(modelId)
+        );
+
+    filteredParts.forEach((part) => {
+
+        const option = document.createElement('option');
+
+        option.value = part.name;
+        option.textContent = part.name;
+        option.selected =
+            part.name === selectedPart;
+
+        inventoryPartItem.appendChild(option);
+    });
+
+    inventoryPartItem.disabled =
+        filteredParts.length === 0;
+}
+
+
+function resetInventorySelectors() {
+
+    if (inventoryCategory) {
+        inventoryCategory.value = '';
+    }
+
+    if (inventoryModel) {
+        inventoryModel.innerHTML =
+            '<option value="">Select Model</option>';
+        inventoryModel.disabled = true;
+    }
+
+    if (inventoryPartItem) {
+        inventoryPartItem.innerHTML =
+            '<option value="">Select Part / Item</option>';
+        inventoryPartItem.disabled = true;
+    }
+}
+
+
+function renderMasterTables() {
+
+    const body =
+        document.getElementById('masterDataBody');
+
+    if (!body) {
+        return;
+    }
+
+    body.innerHTML = '';
+
+    if (masterCategories.length === 0) {
+
+        body.innerHTML = `
+            <tr class="empty-row">
+                <td colspan="3">
+                    No master data created yet.
+                </td>
+            </tr>
+        `;
+
+        return;
+    }
+
+    masterCategories.forEach((category) => {
+
+        const categoryModels =
+            masterModels.filter((model) =>
+                String(model.category_id) === String(category.id)
+            );
+
+        const row =
+            document.createElement('tr');
+
+        const modelText =
+            categoryModels.length
+                ? categoryModels
+                    .map((model) => {
+
+                        const parts =
+                            masterParts.filter((part) =>
+                                String(part.model_id) === String(model.id)
+                            );
+
+                        const partText =
+                            parts.length
+                                ? ` — Parts: ${parts.map((p) => escapeHtml(p.name)).join(', ')}`
+                                : '';
+
+                        return `${escapeHtml(model.name)}${partText}`;
+                    })
+                    .join('<br>')
+                : 'No models';
+
+        row.innerHTML = `
+            <td>
+                <strong>${escapeHtml(category.name)}</strong>
+                <br>
+                <button
+                    type="button"
+                    class="row-delete master-delete-category"
+                    data-id="${category.id}"
+                >
+                    Delete
+                </button>
+            </td>
+
+            <td>
+                ${modelText}
+            </td>
+
+            <td>
+                ${categoryModels.length
+                    ? categoryModels.map((model) => {
+                        const parts = masterParts.filter((part) =>
+                            String(part.model_id) === String(model.id)
+                        );
+                        return `
+                            <div style="margin-bottom:8px;">
+                                <strong>${escapeHtml(model.name)}</strong>
+                                <button
+                                    type="button"
+                                    class="row-delete master-delete-model"
+                                    data-id="${model.id}"
+                                    style="margin-left:8px;"
+                                >
+                                    Delete Model
+                                </button>
+                                <div style="margin-top:4px;">
+                                    ${parts.length
+                                        ? parts.map((part) => `
+                                            <span style="display:inline-block;margin:2px 6px 2px 0;">
+                                                ${escapeHtml(part.name)}
+                                                <button
+                                                    type="button"
+                                                    class="row-delete master-delete-part"
+                                                    data-id="${part.id}"
+                                                >
+                                                    Delete
+                                                </button>
+                                            </span>
+                                        `).join('')
+                                        : '<span>No parts/items</span>'}
+                                </div>
+                            </div>
+                        `;
+                    }).join('')
+                    : 'No parts/items'}
+            </td>
+        `;
+
+        body.appendChild(row);
+    });
+}
+
+
+async function loadMasterData() {
+
+    try {
+
+        const data =
+            await api('/api/master');
+
+        masterCategories =
+            Array.isArray(data.categories)
+                ? data.categories
+                : [];
+
+        masterModels =
+            Array.isArray(data.models)
+                ? data.models
+                : [];
+
+        masterParts =
+            Array.isArray(data.parts)
+                ? data.parts
+                : [];
+
+        populateMasterCategorySelect(
+            masterModelCategory
+        );
+
+        populateMasterCategorySelect(
+            masterPartCategory
+        );
+
+        populateMasterModelSelect(
+            masterPartModel,
+            masterPartCategory
+                ? masterPartCategory.value
+                : ''
+        );
+
+        populateInventoryCategoryOptions();
+
+        renderMasterTables();
+
+    } catch (err) {
+
+        console.error(
+            'Master data loading error:',
+            err
+        );
+
+        toast(
+            'Could not load Master data: ' +
+            err.message,
+            true
+        );
+    }
+}
+
+
+if (masterModelCategory) {
+
+    masterModelCategory.addEventListener(
+        'change',
+        () => {
+            // The model form needs only the selected category.
+        }
+    );
+}
+
+
+if (masterPartCategory) {
+
+    masterPartCategory.addEventListener(
+        'change',
+        () => {
+
+            populateMasterModelSelect(
+                masterPartModel,
+                masterPartCategory.value
+            );
+        }
+    );
+}
+
+
+if (inventoryCategory) {
+
+    inventoryCategory.addEventListener(
+        'change',
+        () => {
+
+            populateInventoryModelOptions(
+                inventoryCategory.value
+            );
+        }
+    );
+}
+
+
+if (inventoryModel) {
+
+    inventoryModel.addEventListener(
+        'change',
+        () => {
+
+            populateInventoryPartOptions(
+                inventoryCategory
+                    ? inventoryCategory.value
+                    : '',
+                inventoryModel.value
+            );
+        }
+    );
+}
+
+
+// ============================================================
+// MASTER - ADD CATEGORY
+// ============================================================
+
+if (masterCategoryForm) {
+
+    masterCategoryForm.addEventListener(
+        'submit',
+        async (event) => {
+
+            event.preventDefault();
+
+            const name =
+                masterCategoryName
+                    ? masterCategoryName.value.trim()
+                    : '';
+
+            if (!name) {
+                toast('Enter category name', true);
+                return;
+            }
+
+            try {
+
+                await api(
+                    '/api/master/categories',
+                    {
+                        method: 'POST',
+                        body: JSON.stringify({ name })
+                    }
+                );
+
+                masterCategoryForm.reset();
+
+                toast('Category added successfully');
+
+                await loadMasterData();
+
+            } catch (err) {
+
+                toast(err.message, true);
+            }
+        }
+    );
+}
+
+
+// ============================================================
+// MASTER - ADD MODEL
+// ============================================================
+
+if (masterModelForm) {
+
+    masterModelForm.addEventListener(
+        'submit',
+        async (event) => {
+
+            event.preventDefault();
+
+            const categoryId =
+                masterModelCategory
+                    ? masterModelCategory.value
+                    : '';
+
+            const name =
+                masterModelName
+                    ? masterModelName.value.trim()
+                    : '';
+
+            if (!categoryId) {
+                toast('Select a category', true);
+                return;
+            }
+
+            if (!name) {
+                toast('Enter model name', true);
+                return;
+            }
+
+            try {
+
+                await api(
+                    '/api/master/models',
+                    {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            category_id: Number(categoryId),
+                            name
+                        })
+                    }
+                );
+
+                masterModelForm.reset();
+
+                toast('Model added successfully');
+
+                await loadMasterData();
+
+            } catch (err) {
+
+                toast(err.message, true);
+            }
+        }
+    );
+}
+
+
+// ============================================================
+// MASTER - ADD PART / ITEM
+// ============================================================
+
+if (masterPartForm) {
+
+    masterPartForm.addEventListener(
+        'submit',
+        async (event) => {
+
+            event.preventDefault();
+
+            const modelId =
+                masterPartModel
+                    ? masterPartModel.value
+                    : '';
+
+            const name =
+                masterPartName
+                    ? masterPartName.value.trim()
+                    : '';
+
+            if (!modelId) {
+                toast('Select a model', true);
+                return;
+            }
+
+            if (!name) {
+                toast('Enter part / item name', true);
+                return;
+            }
+
+            try {
+
+                await api(
+                    '/api/master/parts',
+                    {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            model_id: Number(modelId),
+                            name
+                        })
+                    }
+                );
+
+                masterPartForm.reset();
+
+                if (masterPartModel) {
+                    masterPartModel.innerHTML =
+                        '<option value="">Select Model</option>';
+                    masterPartModel.disabled = true;
+                }
+
+                toast('Part / Item added successfully');
+
+                await loadMasterData();
+
+            } catch (err) {
+
+                toast(err.message, true);
+            }
+        }
+    );
+}
+
+
+// ============================================================
+// MASTER - DELETE
+// ============================================================
+
+document.addEventListener(
+    'click',
+    async (event) => {
+
+        const categoryButton =
+            event.target.closest('.master-delete-category');
+
+        const modelButton =
+            event.target.closest('.master-delete-model');
+
+        const partButton =
+            event.target.closest('.master-delete-part');
+
+        const button =
+            categoryButton ||
+            modelButton ||
+            partButton;
+
+        if (!button) {
+            return;
+        }
+
+        const id =
+            button.getAttribute('data-id');
+
+        if (!id) {
+            return;
+        }
+
+        let endpoint = '';
+        let label = '';
+
+        if (categoryButton) {
+            endpoint = `/api/master/categories/${id}`;
+            label = 'category';
+        } else if (modelButton) {
+            endpoint = `/api/master/models/${id}`;
+            label = 'model';
+        } else {
+            endpoint = `/api/master/parts/${id}`;
+            label = 'part / item';
+        }
+
+        if (!confirm(`Delete this ${label}?`)) {
+            return;
+        }
+
+        try {
+
+            await api(
+                endpoint,
+                {
+                    method: 'DELETE'
+                }
+            );
+
+            toast(
+                `${label} deleted successfully`
+            );
+
+            await loadMasterData();
+
+        } catch (err) {
+
+            toast(err.message, true);
+        }
+    }
+);
+
+
+// ============================================================
+// INVENTORY - RENDER
+// ============================================================
+
+function renderInventoryTable() {
+
+    const body =
+        document.getElementById(
+            'inventoryBody'
+        );
+
+    if (!body) {
+        return;
+    }
+
+    body.innerHTML = '';
+
+    const searchText =
+        inventorySearch
+            ? inventorySearch.value.trim().toLowerCase()
+            : '';
+
+    const filteredRows =
+        inventoryData.filter((item) => {
+
+            const searchableText = [
+                item.product_name,
+                item.category,
+                item.model,
+                item.part_item
+            ]
+                .map((value) =>
+                    String(value || '').toLowerCase()
+                )
+                .join(' ');
+
+            return searchableText.includes(searchText);
+        });
+
+    let totalQuantity = 0;
+
+    if (filteredRows.length === 0) {
+
+        body.innerHTML = `
+            <tr class="empty-row">
+                <td colspan="9">
+                    ${
+                        searchText
+                            ? 'No products found for your search.'
+                            : 'No inventory items found.'
+                    }
+                </td>
+            </tr>
+        `;
+
+        const totalEl =
+            document.getElementById(
+                'inventoryTotalQuantity'
+            );
+
+        if (totalEl) {
+            totalEl.textContent = '0';
+        }
+
+        return;
+    }
+
+    filteredRows.forEach((r) => {
+
+        const quantity = Number(r.quantity) || 0;
+
+        totalQuantity += quantity;
+
+        let status = 'In Stock';
+        let statusClass = 'stock-in';
+
+        if (quantity < 0) {
+            status = 'Stock Shortage';
+            statusClass = 'stock-shortage';
+        } else if (quantity === 0) {
+            status = 'Out of Stock';
+            statusClass = 'stock-out';
+        } else if (quantity <= 2) {
+            status = 'Low Stock';
+            statusClass = 'stock-low';
+        }
+
+        const tr =
+            document.createElement('tr');
+
+        tr.innerHTML = `
+
+            <td>
+                ${escapeHtml(r.product_name || '')}
+            </td>
+
+            <td>
+                ${escapeHtml(r.category || '')}
+            </td>
+
+            <td>
+                ${escapeHtml(r.model || '')}
+            </td>
+
+            <td>
+                ${escapeHtml(r.part_item || '')}
+            </td>
+
+            <td>
+                ${fmt(r.purchase_price)}
+            </td>
+
+            <td>
+                ${fmt(r.selling_price)}
+            </td>
+
+            <td>
+                ${quantity}
+            </td>
+
+            <td>
+                <span class="stock-status ${statusClass}">
+                    ${status}
+                </span>
+            </td>
+
+            <td>
+                <button
+                    type="button"
+                    class="row-edit"
+                >
+                    Edit
+                </button>
+
+                <button
+                    type="button"
+                    class="row-delete"
+                >
+                    Delete
+                </button>
+            </td>
+
+        `;
+
+        const editButton =
+            tr.querySelector('.row-edit');
+
+        if (editButton) {
+            editButton.addEventListener(
+                'click',
+                async () => {
+                    await editInventory(r);
+                }
+            );
+        }
+
+        const deleteButton =
+            tr.querySelector('.row-delete');
+
+        if (deleteButton) {
+            deleteButton.addEventListener(
+                'click',
+                async () => {
+
+                    if (!confirm('Delete this inventory item?')) {
+                        return;
+                    }
+
+                    try {
+                        await api(
+                            `/api/inventory/${r.id}`,
+                            {
+                                method: 'DELETE'
+                            }
+                        );
+
+                        toast('Inventory item deleted');
+                        await loadInventory();
+
+                    } catch (err) {
+                        console.error(
+                            'Delete inventory error:',
+                            err
+                        );
+
+                        toast(
+                            err.message,
+                            true
+                        );
+                    }
+                }
+            );
+        }
+
+        body.appendChild(tr);
+    });
+
+    const totalEl =
+        document.getElementById(
+            'inventoryTotalQuantity'
+        );
+
+    if (totalEl) {
+        totalEl.textContent = totalQuantity;
+    }
+}
+
+
+// ============================================================
+// INVENTORY - LOAD
+// ============================================================
+
+async function loadInventory() {
+
+    try {
+
+        const rows =
+            await api(
+                '/api/inventory'
+            );
+
+
+        // Store latest inventory data
+        // for live search.
+
+        inventoryData =
+            Array.isArray(rows)
+                ? rows
+                : [];
+
+
+        // Refresh Part / Item dropdowns in Sales and Repairs.
+        populateSalesPartItemOptions();
+        populateRepairPartItemOptions();
+
+
+        // Automatically update stock alerts.
+        renderInventoryAlerts();
+
+
+        // Render inventory table.
+
+        renderInventoryTable();
+
+
+    } catch (err) {
+
+        console.error(
+            'Inventory loading error:',
+            err
+        );
+
+
+        toast(
+            'Could not load inventory: ' +
+            err.message,
+            true
+        );
+
+    }
+
+}
+
+
+// ============================================================
+// INVENTORY - SEARCH
+// ============================================================
+
+if (inventorySearch) {
+
+    inventorySearch.addEventListener(
+        'input',
+        () => {
+
+            renderInventoryTable();
+
+        }
+    );
+
+}
+
+
+// ============================================================
+// INVENTORY - ADD
+// ============================================================
+
+if (inventoryForm) {
+
+    inventoryForm.addEventListener(
+        'submit',
+        async (e) => {
+
+            e.preventDefault();
+
+            const f = e.target;
+
+            const payload = {
+                product_name:
+                    f.product_name.value.trim(),
+
+                category:
+                    f.category.value,
+
+                model:
+                    f.model.value,
+
+                part_item:
+                    f.part_item.value,
+
+                purchase_price:
+                    Number(f.purchase_price.value) || 0,
+
+                selling_price:
+                    Number(f.selling_price.value) || 0,
+
+                quantity:
+                    Number(f.quantity.value) || 0
+            };
+
+            if (!payload.product_name) {
+                toast('Enter product name', true);
+                return;
+            }
+
+            if (!payload.category) {
+                toast('Select a category', true);
+                return;
+            }
+
+            if (!payload.model) {
+                toast('Select a model', true);
+                return;
+            }
+
+            if (!payload.part_item) {
+                toast('Select a part / item', true);
+                return;
+            }
+
+            if (!Number.isInteger(payload.quantity) || payload.quantity < 0) {
+                toast('Quantity must be 0 or greater', true);
+                return;
+            }
+
+            if (
+                !Number.isFinite(payload.purchase_price) ||
+                payload.purchase_price < 0 ||
+                !Number.isFinite(payload.selling_price) ||
+                payload.selling_price < 0
+            ) {
+                toast('Invalid purchase or selling amount', true);
+                return;
+            }
+
+            try {
+
+                await api(
+                    '/api/inventory',
+                    {
+                        method: 'POST',
+                        body: JSON.stringify(payload)
+                    }
+                );
+
+                f.reset();
+                resetInventorySelectors();
+
+                toast(
+                    'Inventory item added successfully'
+                );
+
+                await loadInventory();
+
+            } catch (err) {
+
+                console.error(
+                    'Add inventory error:',
+                    err
+                );
+
+                toast(
+                    err.message,
+                    true
+                );
+            }
+        }
+    );
+}
+
+
+// ============================================================
+// INVENTORY - EDIT
+// ============================================================
+
+async function editInventory(item) {
+
+    try {
+
+        const productName =
+            prompt(
+                'Product name:',
+                item.product_name || ''
+            );
+
+        if (productName === null) {
+            return;
+        }
+
+        const category =
+            prompt(
+                'Category (iPhone/Samsung/Redmi/etc.):',
+                item.category || ''
+            );
+
+        if (category === null) {
+            return;
+        }
+
+        const model =
+            prompt(
+                'Model:',
+                item.model || ''
+            );
+
+        if (model === null) {
+            return;
+        }
+
+        const partItem =
+            prompt(
+                'Part / Item:',
+                item.part_item || ''
+            );
+
+        if (partItem === null) {
+            return;
+        }
+
+        const purchasePriceInput =
+            prompt(
+                'Purchase amount:',
+                item.purchase_price || 0
+            );
+
+        if (purchasePriceInput === null) {
+            return;
+        }
+
+        const sellingPriceInput =
+            prompt(
+                'Selling amount:',
+                item.selling_price || 0
+            );
+
+        if (sellingPriceInput === null) {
+            return;
+        }
+
+        const quantityInput =
+            prompt(
+                'Quantity:',
+                item.quantity || 0
+            );
+
+        if (quantityInput === null) {
+            return;
+        }
+
+        const cleanProductName =
+            productName.trim();
+
+        const cleanCategory =
+            category.trim();
+
+        const cleanModel =
+            model.trim();
+
+        const cleanPartItem =
+            partItem.trim();
+
+        const purchasePrice =
+            Number(purchasePriceInput);
+
+        const sellingPrice =
+            Number(sellingPriceInput);
+
+        const quantity =
+            Number(quantityInput);
+
+        if (!cleanProductName || !cleanCategory || !cleanModel || !cleanPartItem) {
+            toast(
+                'Product name, category, model and part / item are required',
+                true
+            );
+            return;
+        }
+
+        if (
+            !Number.isFinite(purchasePrice) ||
+            purchasePrice < 0 ||
+            !Number.isFinite(sellingPrice) ||
+            sellingPrice < 0
+        ) {
+            toast(
+                'Invalid purchase or selling amount',
+                true
+            );
+            return;
+        }
+
+        if (
+            !Number.isFinite(quantity) ||
+            quantity < 0 ||
+            !Number.isInteger(quantity)
+        ) {
+            toast(
+                'Invalid quantity',
+                true
+            );
+            return;
+        }
+
+        const payload = {
+            product_name:
+                cleanProductName,
+
+            category:
+                cleanCategory,
+
+            model:
+                cleanModel,
+
+            part_item:
+                cleanPartItem,
+
+            purchase_price:
+                purchasePrice,
+
+            selling_price:
+                sellingPrice,
+
+            quantity:
+                quantity
+        };
+
+        await api(
+            `/api/inventory/${item.id}`,
+            {
+                method: 'PUT',
+                body: JSON.stringify(payload)
+            }
+        );
+
+        toast(
+            'Inventory updated successfully'
+        );
+
+        await loadInventory();
+
+    } catch (err) {
+
+        console.error(
+            'Edit inventory error:',
+            err
+        );
+
+        toast(
+            'Could not update inventory: ' +
+            err.message,
+            true
+        );
+    }
 }
 
 
@@ -1213,7 +3222,7 @@ async function loadEnquiries() {
 
                 <tr class="empty-row">
 
-                    <td colspan="3">
+                    <td colspan="4">
                         No enquiries recorded yet.
                     </td>
 
@@ -1239,7 +3248,11 @@ async function loadEnquiries() {
                 </td>
 
                 <td>
-                    ${escapeHtml(r.product_name)}
+                    ${escapeHtml(r.customer_number)}
+                </td>
+
+                <td>
+                    ${escapeHtml(r.customer_enquiry)}
                 </td>
 
                 <td>
@@ -1299,7 +3312,10 @@ async function loadEnquiries() {
 
                         } catch (err) {
 
-                            console.error(err);
+                            console.error(
+                                'Delete enquiry error:',
+                                err
+                            );
 
 
                             toast(
@@ -1343,12 +3359,6 @@ async function loadEnquiries() {
 // ENQUIRIES - ADD
 // ============================================================
 
-const enquiriesForm =
-    document.getElementById(
-        'enquiriesForm'
-    );
-
-
 if (enquiriesForm) {
 
     enquiriesForm.addEventListener(
@@ -1361,21 +3371,19 @@ if (enquiriesForm) {
             const f = e.target;
 
 
-            const payload = {
-
-                enquiry_date:
-                    state.date,
-
-                customer_name:
-                    f.customer_name.value.trim(),
-
-                product_name:
-                    f.product_name.value.trim()
-
-            };
+            const customerName =
+                f.customer_name.value.trim();
 
 
-            if (!payload.customer_name) {
+            const customerNumber =
+                f.customer_number.value.trim();
+
+
+            const customerEnquiry =
+                f.customer_enquiry.value.trim();
+
+
+            if (!customerName) {
 
                 toast(
                     'Enter customer name',
@@ -1387,16 +3395,33 @@ if (enquiriesForm) {
             }
 
 
-            if (!payload.product_name) {
+            if (!customerEnquiry) {
 
                 toast(
-                    'Enter product name',
+                    'Enter customer enquiry',
                     true
                 );
 
                 return;
 
             }
+
+
+            const payload = {
+
+                enquiry_date:
+                    state.date,
+
+                customer_name:
+                    customerName,
+
+                customer_number:
+                    customerNumber,
+
+                customer_enquiry:
+                    customerEnquiry
+
+            };
 
 
             try {
@@ -1452,74 +3477,256 @@ if (enquiriesForm) {
 // REPAIRS - LOAD
 // ============================================================
 
-async function loadRepairs() {
+// ============================================================
+// REPAIR DATE/TIME FORMATTER
+// ============================================================
 
-    try {
+function formatRepairDateTime(value) {
 
-        const rows = await api(
-            `/api/repairs?${currentFilterQuery()}`
+    if (!value) {
+        return 'Not recorded';
+    }
+
+    const text = String(value).trim();
+
+    if (!text) {
+        return 'Not recorded';
+    }
+
+    const normalized =
+        text.includes('T')
+            ? text
+            : text.replace(' ', 'T');
+
+    const d = new Date(normalized);
+
+    if (Number.isNaN(d.getTime())) {
+        return escapeHtml(text);
+    }
+
+    return d.toLocaleString('en-IN', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+    });
+
+}
+
+
+// ============================================================
+// REPAIRS - RENDER
+// ============================================================
+
+function renderRepairsTable() {
+
+    const body =
+        document.getElementById(
+            'repairsBody'
         );
 
 
-        const body =
-            document.getElementById(
-                'repairsBody'
+    if (!body) {
+
+        return;
+
+    }
+
+
+    body.innerHTML = '';
+
+
+    // --------------------------------------------------------
+    // SEARCH TEXT
+    // --------------------------------------------------------
+
+    const searchText =
+        repairSearch
+            ? repairSearch.value
+                .trim()
+                .toLowerCase()
+            : '';
+
+
+    // --------------------------------------------------------
+    // STATUS FILTER
+    // --------------------------------------------------------
+
+    const selectedStatus =
+        repairStatusFilter
+            ? repairStatusFilter.value
+            : '';
+
+
+    // --------------------------------------------------------
+    // FILTER REPAIRS
+    // --------------------------------------------------------
+
+    const filteredRows =
+        repairData.filter((r) => {
+
+            const customerName =
+                String(
+                    r.customer_name || ''
+                ).toLowerCase();
+
+
+            const customerNumber =
+                String(
+                    r.customer_number || ''
+                ).toLowerCase();
+
+
+            const productName =
+                String(
+                    r.product_name || ''
+                ).toLowerCase();
+
+
+            const model =
+                String(
+                    r.model || ''
+                ).toLowerCase();
+
+
+            const issue =
+                String(
+                    r.issue || ''
+                ).toLowerCase();
+
+
+            const partRequest =
+                String(
+                    r.part_request || ''
+                ).toLowerCase();
+
+
+            const searchableText =
+                [
+                    customerName,
+                    customerNumber,
+                    productName,
+                    model,
+                    issue,
+                    partRequest
+                ].join(' ');
+
+
+            const matchesSearch =
+                searchableText.includes(
+                    searchText
+                );
+
+
+            const matchesStatus =
+                !selectedStatus ||
+                selectedStatus === 'All' ||
+                String(r.status || '') ===
+                    selectedStatus;
+
+
+            return (
+                matchesSearch &&
+                matchesStatus
+            );
+
+        });
+
+
+    // --------------------------------------------------------
+    // TOTALS
+    // --------------------------------------------------------
+
+    let totalAmount = 0;
+
+    let totalAdvance = 0;
+
+    let totalBalance = 0;
+
+
+    // --------------------------------------------------------
+    // NO RESULTS
+    // --------------------------------------------------------
+
+    if (
+        filteredRows.length === 0
+    ) {
+
+        body.innerHTML = `
+
+            <tr class="empty-row">
+
+                <td colspan="11">
+
+                    ${
+                        searchText ||
+                        (
+                            selectedStatus &&
+                            selectedStatus !== 'All'
+                        )
+                            ? 'No matching repairs found.'
+                            : 'No repairs recorded yet.'
+                    }
+
+                </td>
+
+            </tr>
+
+        `;
+
+
+        updateRepairTotals(
+            0,
+            0,
+            0
+        );
+
+
+        return;
+
+    }
+
+
+    // --------------------------------------------------------
+    // RENDER REPAIRS
+    // --------------------------------------------------------
+
+    filteredRows.forEach((r) => {
+
+        const amount =
+            Number(r.amount) || 0;
+
+
+        const advance =
+            Number(r.advance) || 0;
+
+
+        const balance =
+            Math.max(
+                0,
+                amount - advance
             );
 
 
-        if (!body) {
+        totalAmount += amount;
 
-            return;
+        totalAdvance += advance;
 
-        }
-
-
-        body.innerHTML = '';
+        totalBalance += balance;
 
 
-        if (!Array.isArray(rows) || rows.length === 0) {
+        // ----------------------------------------------------
+        // STATUS OPTIONS
+        // ----------------------------------------------------
 
-            body.innerHTML = `
+        const statusOptions =
+            REPAIR_STATUSES
+                .map(
+                    (status) => {
 
-                <tr class="empty-row">
-
-                    <td colspan="4">
-                        No repairs recorded yet.
-                    </td>
-
-                </tr>
-
-            `;
-
-            return;
-
-        }
-
-
-        rows.forEach((r) => {
-
-            const tr =
-                document.createElement('tr');
-
-
-            tr.innerHTML = `
-
-                <td>
-                    ${escapeHtml(r.customer_name)}
-                </td>
-
-                <td>
-                    ${escapeHtml(r.product_name)}
-                </td>
-
-                <td>
-
-                    <select
-                        class="repair-status"
-                    >
-
-                        ${REPAIR_STATUSES.map(
-                            (status) => `
+                        return `
 
                             <option
                                 value="${escapeHtml(status)}"
@@ -1532,129 +3739,199 @@ async function loadRepairs() {
                                 ${escapeHtml(status)}
                             </option>
 
-                        `
-                        ).join('')}
+                        `;
 
-                    </select>
-
-                </td>
-
-                <td>
-
-                    <button
-                        type="button"
-                        class="row-delete"
-                    >
-                        Delete
-                    </button>
-
-                </td>
-
-            `;
+                    }
+                )
+                .join('');
 
 
-            // =================================================
-            // DELETE REPAIR
-            // =================================================
+        // ----------------------------------------------------
+        // CREATE ROW
+        // ----------------------------------------------------
 
-            const deleteButton =
-                tr.querySelector('.row-delete');
+        const tr =
+            document.createElement('tr');
 
 
-            if (deleteButton) {
+        tr.innerHTML = `
 
-                deleteButton.addEventListener(
-                    'click',
-                    async () => {
+            <td>
+                ${escapeHtml(r.customer_name)}
+            </td>
 
-                        if (
-                            !confirm(
-                                'Delete this repair?'
-                            )
-                        ) {
+            <td>
+                <button
+                    type="button"
+                    class="repair-customer-number"
+                    title="View repair details"
+                >
+                    ${escapeHtml(r.customer_number || '—')}
+                </button>
+            </td>
+
+            <td>
+                ${escapeHtml(r.product_name)}
+            </td>
+
+            <td>
+                ${escapeHtml(r.model)}
+            </td>
+
+            <td>
+                ${escapeHtml(r.issue)}
+            </td>
+
+            <td>
+                ${escapeHtml(r.part_request)}
+            </td>
+
+            <td>
+                ${fmt(amount)}
+            </td>
+
+            <td>
+                ${fmt(advance)}
+            </td>
+
+            <td>
+                ${fmt(balance)}
+            </td>
+
+            <td>
+
+                <select
+                    class="repair-status"
+                >
+
+                    ${statusOptions}
+
+                </select>
+
+            </td>
+
+            <td>
+
+                <button
+                    type="button"
+                    class="row-delete"
+                >
+                    Delete
+                </button>
+
+            </td>
+
+        `;
+
+
+        // ----------------------------------------------------
+        // CUSTOMER NUMBER CLICK
+        // ----------------------------------------------------
+
+        const customerNumberButton =
+            tr.querySelector(
+                '.repair-customer-number'
+            );
+
+
+        if (customerNumberButton) {
+
+            customerNumberButton.addEventListener(
+                'click',
+                () => {
+
+                    openRepairDetails(r);
+
+                }
+            );
+
+        }
+
+
+        // ----------------------------------------------------
+        // STATUS CHANGE
+        // ----------------------------------------------------
+
+        const statusSelect =
+            tr.querySelector(
+                '.repair-status'
+            );
+
+
+        if (statusSelect) {
+
+            statusSelect.addEventListener(
+                'change',
+                async (e) => {
+
+                    const newStatus =
+                        e.target.value;
+
+
+                    // ----------------------------------------
+                    // DELIVERED REPAIR CANNOT GO BACK
+                    // ----------------------------------------
+
+                    if (
+                        Number(r.sales_recorded) === 1 &&
+                        newStatus !==
+                            'Delivered to Customer'
+                    ) {
+
+                        toast(
+                            'Delivered repair cannot be moved back.',
+                            true
+                        );
+
+
+                        await loadRepairs();
+
+
+                        return;
+
+                    }
+
+
+                    // ----------------------------------------
+                    // DELIVERY CONFIRMATION
+                    // ----------------------------------------
+
+                    if (
+                        newStatus ===
+                        'Delivered to Customer'
+                    ) {
+
+                        const confirmDelivery =
+                            confirm(
+                                'Mark this repair as Delivered to Customer?\n\n' +
+                                'If a part was requested, stock will be reduced.\n' +
+                                'The repair will also be recorded as a sale.'
+                            );
+
+
+                        if (!confirmDelivery) {
+
+                            await loadRepairs();
+
 
                             return;
 
                         }
 
-
-                        try {
-
-                            await api(
-                                `/api/repairs/${r.id}`,
-                                {
-                                    method: 'DELETE'
-                                }
-                            );
-
-
-                            toast(
-                                'Repair deleted'
-                            );
-
-
-                            await loadRepairs();
-
-                            await loadSummary();
-
-
-                        } catch (err) {
-
-                            console.error(err);
-
-
-                            toast(
-                                err.message,
-                                true
-                            );
-
-                        }
-
                     }
-                );
-
-            }
 
 
-            // =================================================
-            // CHANGE REPAIR STATUS
-            // =================================================
+                    try {
 
-            const statusSelect =
-                tr.querySelector(
-                    '.repair-status'
-                );
-
-
-            if (statusSelect) {
-
-                statusSelect.addEventListener(
-                    'change',
-                    async (e) => {
-
-                        const newStatus =
-                            e.target.value;
-
-
-                        try {
-
+                        const result =
                             await api(
-                                `/api/repairs/${r.id}`,
+                                `/api/repairs/${r.id}/status`,
                                 {
 
-                                    method: 'PUT',
+                                    method: 'PATCH',
 
                                     body:
                                         JSON.stringify({
-
-                                            repair_date:
-                                                r.repair_date,
-
-                                            customer_name:
-                                                r.customer_name,
-
-                                            product_name:
-                                                r.product_name,
 
                                             status:
                                                 newStatus
@@ -1665,40 +3942,364 @@ async function loadRepairs() {
                             );
 
 
+                        if (
+                            newStatus ===
+                            'Delivered to Customer'
+                        ) {
+
+                            const deliveryBalance =
+                                Number(
+                                    result.balance
+                                ) || 0;
+
+
+                            toast(
+                                `Repair delivered. Balance: ${fmt(deliveryBalance)}`
+                            );
+
+                        }
+
+                        else {
+
                             toast(
                                 `Status changed to ${newStatus}`
                             );
 
-
-                            await loadRepairs();
-
-                            await loadSummary();
-
-
-                        } catch (err) {
-
-                            console.error(err);
-
-
-                            toast(
-                                err.message,
-                                true
-                            );
-
-
-                            await loadRepairs();
-
                         }
 
+
+                        await loadRepairs();
+
+                        await loadInventory();
+
+                        await loadSales();
+
+                        await loadSummary();
+
+
+                    } catch (err) {
+
+                        console.error(
+                            'Repair status error:',
+                            err
+                        );
+
+
+                        toast(
+                            err.message,
+                            true
+                        );
+
+
+                        await loadRepairs();
+
                     }
-                );
+
+                }
+            );
+
+        }
+
+
+        // ----------------------------------------------------
+        // DELETE
+        // ----------------------------------------------------
+
+        const deleteButton =
+            tr.querySelector(
+                '.row-delete'
+            );
+
+
+        if (deleteButton) {
+
+            if (
+                Number(r.sales_recorded) === 1 ||
+                Number(r.stock_reduced) === 1
+            ) {
+
+                deleteButton.disabled = true;
+
+                deleteButton.title =
+                    'Processed repair cannot be deleted';
 
             }
 
 
-            body.appendChild(tr);
+            deleteButton.addEventListener(
+                'click',
+                async () => {
 
-        });
+                    if (
+                        Number(r.sales_recorded) === 1 ||
+                        Number(r.stock_reduced) === 1
+                    ) {
+
+                        toast(
+                            'Processed repair cannot be deleted.',
+                            true
+                        );
+
+
+                        return;
+
+                    }
+
+
+                    if (
+                        !confirm(
+                            'Delete this repair?'
+                        )
+                    ) {
+
+                        return;
+
+                    }
+
+
+                    try {
+
+                        await api(
+                            `/api/repairs/${r.id}`,
+                            {
+                                method: 'DELETE'
+                            }
+                        );
+
+
+                        toast(
+                            'Repair deleted'
+                        );
+
+
+                        await loadRepairs();
+
+                        await loadSummary();
+
+
+                    } catch (err) {
+
+                        console.error(
+                            'Delete repair error:',
+                            err
+                        );
+
+
+                        toast(
+                            err.message,
+                            true
+                        );
+
+                    }
+
+                }
+            );
+
+        }
+
+
+        body.appendChild(tr);
+
+    });
+
+
+    // --------------------------------------------------------
+    // UPDATE TOTALS
+    // --------------------------------------------------------
+
+    updateRepairTotals(
+        totalAmount,
+        totalAdvance,
+        totalBalance
+    );
+
+}
+
+
+// ============================================================
+// REPAIR DETAILS POPUP
+// ============================================================
+
+function openRepairDetails(repair) {
+
+    const modal =
+        document.getElementById(
+            'repairDetailsModal'
+        );
+
+    const content =
+        document.getElementById(
+            'repairDetailsContent'
+        );
+
+    if (!modal || !content) {
+        return;
+    }
+
+    const amount = Number(repair.amount) || 0;
+
+    const advance = Number(repair.advance) || 0;
+
+    const balance = Math.max(0, amount - advance);
+
+    content.innerHTML = `
+
+        <div class="repair-detail-grid">
+
+            <div><span>Customer Name</span><strong>${escapeHtml(repair.customer_name || '—')}</strong></div>
+
+            <div><span>Customer Number</span><strong>${escapeHtml(repair.customer_number || '—')}</strong></div>
+
+            <div><span>Product</span><strong>${escapeHtml(repair.product_name || '—')}</strong></div>
+
+            <div><span>Model</span><strong>${escapeHtml(repair.model || '—')}</strong></div>
+
+            <div><span>Issue</span><strong>${escapeHtml(repair.issue || '—')}</strong></div>
+
+            <div><span>Part Request</span><strong>${escapeHtml(repair.part_request || '—')}</strong></div>
+
+            <div><span>Amount</span><strong>${fmt(amount)}</strong></div>
+
+            <div><span>Advance</span><strong>${fmt(advance)}</strong></div>
+
+            <div><span>Balance</span><strong>${fmt(balance)}</strong></div>
+
+            <div><span>Status</span><strong>${escapeHtml(repair.status || '—')}</strong></div>
+
+            <div class="repair-time-detail"><span>Received Date &amp; Time</span><strong>${formatRepairDateTime(repair.received_at)}</strong></div>
+
+            <div class="repair-time-detail"><span>Delivered Date &amp; Time</span><strong>${formatRepairDateTime(repair.delivered_at)}</strong></div>
+
+        </div>
+
+    `;
+
+    modal.classList.add('open');
+    modal.setAttribute('aria-hidden', 'false');
+
+}
+
+
+function closeRepairDetails() {
+
+    const modal =
+        document.getElementById(
+            'repairDetailsModal'
+        );
+
+    if (!modal) {
+        return;
+    }
+
+    modal.classList.remove('open');
+    modal.setAttribute('aria-hidden', 'true');
+
+}
+
+
+// Repair details modal controls.
+document.addEventListener('click', (event) => {
+
+    if (event.target.closest('.repair-details-close')) {
+        closeRepairDetails();
+        return;
+    }
+
+    if (event.target.matches('#repairDetailsModal')) {
+        closeRepairDetails();
+    }
+
+});
+
+
+document.addEventListener('keydown', (event) => {
+
+    if (event.key === 'Escape') {
+        closeRepairDetails();
+    }
+
+});
+
+
+// ============================================================
+// REPAIR TOTALS
+// ============================================================
+
+function updateRepairTotals(
+    totalAmount,
+    totalAdvance,
+    totalBalance
+) {
+
+    const totalAmountEl =
+        document.getElementById(
+            'repairsTotalAmount'
+        );
+
+
+    const totalAdvanceEl =
+        document.getElementById(
+            'repairsTotalAdvance'
+        );
+
+
+    const totalBalanceEl =
+        document.getElementById(
+            'repairsTotalBalance'
+        );
+
+
+    if (totalAmountEl) {
+
+        totalAmountEl.textContent =
+            fmt(totalAmount);
+
+    }
+
+
+    if (totalAdvanceEl) {
+
+        totalAdvanceEl.textContent =
+            fmt(totalAdvance);
+
+    }
+
+
+    if (totalBalanceEl) {
+
+        totalBalanceEl.textContent =
+            fmt(totalBalance);
+
+    }
+
+}
+
+
+// ============================================================
+// REPAIRS - LOAD
+// ============================================================
+
+async function loadRepairs() {
+
+    try {
+
+        const rows = await api(
+            `/api/repairs?${currentFilterQuery()}`
+        );
+
+
+        // Store latest repair data.
+
+        repairData =
+            Array.isArray(rows)
+                ? rows
+                : [];
+
+
+        // Render with current
+        // search and status filter.
+
+        renderRepairsTable();
 
 
     } catch (err) {
@@ -1721,14 +4322,42 @@ async function loadRepairs() {
 
 
 // ============================================================
-// REPAIRS - ADD
+// REPAIR SEARCH
 // ============================================================
 
-const repairsForm =
-    document.getElementById(
-        'repairsForm'
+if (repairSearch) {
+
+    repairSearch.addEventListener(
+        'input',
+        () => {
+
+            renderRepairsTable();
+
+        }
     );
 
+}
+
+
+// ============================================================
+// REPAIR STATUS FILTER
+// ============================================================
+
+if (repairStatusFilter) {
+
+    repairStatusFilter.addEventListener(
+        'change',
+        () => {
+
+            renderRepairsTable();
+
+        }
+    );
+
+}
+// ============================================================
+// REPAIRS - ADD
+// ============================================================
 
 if (repairsForm) {
 
@@ -1742,24 +4371,43 @@ if (repairsForm) {
             const f = e.target;
 
 
-            const payload = {
-
-                repair_date:
-                    state.date,
-
-                customer_name:
-                    f.customer_name.value.trim(),
-
-                product_name:
-                    f.product_name.value.trim(),
-
-                status:
-                    f.status.value
-
-            };
+            const customerName =
+                f.customer_name.value.trim();
 
 
-            if (!payload.customer_name) {
+            const customerNumber =
+                f.customer_number.value.trim();
+
+
+            const productName =
+                f.product_name.value.trim();
+
+
+            const model =
+                f.model.value.trim();
+
+
+            const issue =
+                f.issue.value.trim();
+
+
+            const partRequest =
+                f.part_request.value.trim();
+
+
+            const amount =
+                Number(f.amount.value) || 0;
+
+
+            const advance =
+                Number(f.advance.value) || 0;
+
+
+            const status =
+                f.status.value;
+
+
+            if (!customerName) {
 
                 toast(
                     'Enter customer name',
@@ -1771,7 +4419,7 @@ if (repairsForm) {
             }
 
 
-            if (!payload.product_name) {
+            if (!productName) {
 
                 toast(
                     'Enter product name',
@@ -1781,6 +4429,77 @@ if (repairsForm) {
                 return;
 
             }
+
+
+            if (amount < 0) {
+
+                toast(
+                    'Amount cannot be negative',
+                    true
+                );
+
+                return;
+
+            }
+
+
+            if (advance < 0) {
+
+                toast(
+                    'Advance cannot be negative',
+                    true
+                );
+
+                return;
+
+            }
+
+
+            if (advance > amount) {
+
+                toast(
+                    'Advance cannot be greater than amount',
+                    true
+                );
+
+                return;
+
+            }
+
+
+            const payload = {
+
+                repair_date:
+                    state.date,
+
+                customer_name:
+                    customerName,
+
+                customer_number:
+                    customerNumber,
+
+                product_name:
+                    productName,
+
+                model:
+                    model,
+
+                issue:
+                    issue,
+
+                part_request:
+                    partRequest,
+
+                amount:
+                    amount,
+
+                advance:
+                    advance,
+
+                status:
+                    status
+
+            };
 
 
             try {
@@ -1805,6 +4524,22 @@ if (repairsForm) {
 
                     f.status.value =
                         'Received';
+
+                }
+
+
+                if (f.amount) {
+
+                    f.amount.value =
+                        '0';
+
+                }
+
+
+                if (f.advance) {
+
+                    f.advance.value =
+                        '0';
 
                 }
 
@@ -1876,10 +4611,6 @@ async function loadPayments() {
         let balanceAmount = 0;
 
 
-        // ====================================================
-        // NO RECORDS
-        // ====================================================
-
         if (!Array.isArray(rows) || rows.length === 0) {
 
             body.innerHTML = `
@@ -1941,10 +4672,6 @@ async function loadPayments() {
 
         }
 
-
-        // ====================================================
-        // DISPLAY PAYMENT RECORDS
-        // ====================================================
 
         rows.forEach((r) => {
 
@@ -2022,10 +4749,6 @@ async function loadPayments() {
             `;
 
 
-            // =================================================
-            // EDIT BUTTON
-            // =================================================
-
             const editButton =
                 tr.querySelector(
                     '.row-edit'
@@ -2045,10 +4768,6 @@ async function loadPayments() {
 
             }
 
-
-            // =================================================
-            // DELETE BUTTON
-            // =================================================
 
             const deleteButton =
                 tr.querySelector(
@@ -2119,10 +4838,6 @@ async function loadPayments() {
         });
 
 
-        // ====================================================
-        // PAYMENT TOTALS
-        // ====================================================
-
         const totalEl =
             document.getElementById(
                 'paymentsTotal'
@@ -2192,10 +4907,6 @@ async function editPayment(payment) {
 
     try {
 
-        // ====================================================
-        // CUSTOMER
-        // ====================================================
-
         const customerName =
             prompt(
                 'Customer name:',
@@ -2210,10 +4921,6 @@ async function editPayment(payment) {
         }
 
 
-        // ====================================================
-        // REFERENCE
-        // ====================================================
-
         const referenceName =
             prompt(
                 'Product / Reference:',
@@ -2227,10 +4934,6 @@ async function editPayment(payment) {
 
         }
 
-
-        // ====================================================
-        // TOTAL
-        // ====================================================
 
         const totalInput =
             prompt(
@@ -2250,10 +4953,6 @@ async function editPayment(payment) {
             Number(totalInput);
 
 
-        // ====================================================
-        // PAID
-        // ====================================================
-
         const paidInput =
             prompt(
                 'Paid amount:',
@@ -2271,10 +4970,6 @@ async function editPayment(payment) {
         const paidAmount =
             Number(paidInput);
 
-
-        // ====================================================
-        // PAYMENT METHOD
-        // ====================================================
 
         const paymentMethod =
             prompt(
@@ -2301,10 +4996,6 @@ async function editPayment(payment) {
         const cleanPaymentMethod =
             paymentMethod.trim();
 
-
-        // ====================================================
-        // VALIDATION
-        // ====================================================
 
         if (!cleanCustomerName) {
 
@@ -2372,10 +5063,6 @@ async function editPayment(payment) {
         }
 
 
-        // ====================================================
-        // VALID PAYMENT METHODS
-        // ====================================================
-
         const validPaymentMethods = [
 
             'Cash',
@@ -2405,10 +5092,6 @@ async function editPayment(payment) {
         }
 
 
-        // ====================================================
-        // UPDATE PAYLOAD
-        // ====================================================
-
         const payload = {
 
             payment_date:
@@ -2436,10 +5119,6 @@ async function editPayment(payment) {
         };
 
 
-        // ====================================================
-        // SEND UPDATE TO FLASK
-        // ====================================================
-
         await api(
             `/api/payments/${payment.id}`,
             {
@@ -2457,10 +5136,6 @@ async function editPayment(payment) {
             'Payment updated successfully'
         );
 
-
-        // ====================================================
-        // REFRESH
-        // ====================================================
 
         await loadPayments();
 
@@ -2489,12 +5164,6 @@ async function editPayment(payment) {
 // ============================================================
 // PAYMENT TRACKING - ADD
 // ============================================================
-
-const paymentsForm =
-    document.getElementById(
-        'paymentsForm'
-    );
-
 
 if (paymentsForm) {
 
@@ -2531,10 +5200,6 @@ if (paymentsForm) {
             const paymentMethod =
                 f.payment_method.value;
 
-
-            // =================================================
-            // VALIDATION
-            // =================================================
 
             if (!customerName) {
 
@@ -2596,10 +5261,6 @@ if (paymentsForm) {
             }
 
 
-            // =================================================
-            // PAYLOAD
-            // =================================================
-
             const payload = {
 
                 payment_date:
@@ -2622,10 +5283,6 @@ if (paymentsForm) {
 
             };
 
-
-            // =================================================
-            // SAVE PAYMENT
-            // =================================================
 
             try {
 
@@ -2695,10 +5352,6 @@ async function loadSummary() {
         let summaryUrl;
 
 
-        // ====================================================
-        // DATE VIEW
-        // ====================================================
-
         if (state.view === 'date') {
 
             summaryUrl =
@@ -2707,11 +5360,6 @@ async function loadSummary() {
                 )}`;
 
         }
-
-
-        // ====================================================
-        // MONTH VIEW
-        // ====================================================
 
         else {
 
@@ -2739,9 +5387,9 @@ async function loadSummary() {
         );
 
 
-        // ====================================================
-        // SALES
-        // ====================================================
+        // ----------------------------------------------------
+        // TODAY'S SALES
+        // ----------------------------------------------------
 
         const sumSales =
             document.getElementById(
@@ -2752,50 +5400,16 @@ async function loadSummary() {
         if (sumSales) {
 
             sumSales.textContent =
-                fmt(s.today_sales);
+                fmt(
+                    s.today_sales
+                );
 
         }
 
 
-        // ====================================================
-        // EXPENSES
-        // ====================================================
-
-        const sumExpenses =
-            document.getElementById(
-                'sumExpenses'
-            );
-
-
-        if (sumExpenses) {
-
-            sumExpenses.textContent =
-                fmt(s.today_expenses);
-
-        }
-
-
-        // ====================================================
-        // PURCHASES
-        // ====================================================
-
-        const sumPurchases =
-            document.getElementById(
-                'sumPurchases'
-            );
-
-
-        if (sumPurchases) {
-
-            sumPurchases.textContent =
-                fmt(s.today_purchases);
-
-        }
-
-
-        // ====================================================
-        // PAYMENT RECEIVED
-        // ====================================================
+        // ----------------------------------------------------
+        // PAYMENTS RECEIVED
+        // ----------------------------------------------------
 
         const sumPaymentsReceived =
             document.getElementById(
@@ -2812,14 +5426,16 @@ async function loadSummary() {
 
 
             sumPaymentsReceived.textContent =
-                fmt(paymentReceived);
+                fmt(
+                    paymentReceived
+                );
 
         }
 
 
-        // ====================================================
-        // PENDING PAYMENT
-        // ====================================================
+        // ----------------------------------------------------
+        // PENDING PAYMENTS
+        // ----------------------------------------------------
 
         const sumPaymentBalance =
             document.getElementById(
@@ -2836,14 +5452,56 @@ async function loadSummary() {
 
 
             sumPaymentBalance.textContent =
-                fmt(paymentBalance);
+                fmt(
+                    paymentBalance
+                );
 
         }
 
 
-        // ====================================================
-        // MONTH ENQUIRIES
-        // ====================================================
+        // ----------------------------------------------------
+        // TODAY'S EXPENSES
+        // ----------------------------------------------------
+
+        const sumExpenses =
+            document.getElementById(
+                'sumExpenses'
+            );
+
+
+        if (sumExpenses) {
+
+            sumExpenses.textContent =
+                fmt(
+                    s.today_expenses
+                );
+
+        }
+
+
+        // ----------------------------------------------------
+        // TODAY'S PURCHASES
+        // ----------------------------------------------------
+
+        const sumPurchases =
+            document.getElementById(
+                'sumPurchases'
+            );
+
+
+        if (sumPurchases) {
+
+            sumPurchases.textContent =
+                fmt(
+                    s.today_purchases
+                );
+
+        }
+
+
+        // ----------------------------------------------------
+        // CUSTOMER ENQUIRIES
+        // ----------------------------------------------------
 
         const sumEnquiries =
             document.getElementById(
@@ -2853,53 +5511,26 @@ async function loadSummary() {
 
         if (sumEnquiries) {
 
+            const enquiryCount =
+                state.view === 'date'
+                    ? (
+                        s.today_enquiries ??
+                        s.month_enquiries
+                    )
+                    : s.month_enquiries;
+
+
             sumEnquiries.textContent =
                 Number(
-                    s.month_enquiries
+                    enquiryCount
                 ) || 0;
 
         }
 
 
-        // ====================================================
-        // MONTH SALES
-        // ====================================================
-
-        const sumMonthSales =
-            document.getElementById(
-                'sumMonthSales'
-            );
-
-
-        if (sumMonthSales) {
-
-            sumMonthSales.textContent =
-                fmt(s.month_sales);
-
-        }
-
-
-        // ====================================================
-        // MONTH EXPENSES
-        // ====================================================
-
-        const sumMonthExpenses =
-            document.getElementById(
-                'sumMonthExpenses'
-            );
-
-
-        if (sumMonthExpenses) {
-
-            sumMonthExpenses.textContent =
-                fmt(s.month_expenses);
-
-        }
-
-
-        // ====================================================
+        // ----------------------------------------------------
         // ACTIVE REPAIRS
-        // ====================================================
+        // ----------------------------------------------------
 
         const sumActiveRepairs =
             document.getElementById(
@@ -2913,6 +5544,46 @@ async function loadSummary() {
                 Number(
                     s.active_repairs
                 ) || 0;
+
+        }
+
+
+        // ----------------------------------------------------
+        // MONTH'S SALES
+        // ----------------------------------------------------
+
+        const sumMonthSales =
+            document.getElementById(
+                'sumMonthSales'
+            );
+
+
+        if (sumMonthSales) {
+
+            sumMonthSales.textContent =
+                fmt(
+                    s.month_sales
+                );
+
+        }
+
+
+        // ----------------------------------------------------
+        // MONTH'S EXPENSES
+        // ----------------------------------------------------
+
+        const sumMonthExpenses =
+            document.getElementById(
+                'sumMonthExpenses'
+            );
+
+
+        if (sumMonthExpenses) {
+
+            sumMonthExpenses.textContent =
+                fmt(
+                    s.month_expenses
+                );
 
         }
 
@@ -2959,8 +5630,22 @@ if (viewToggle) {
             }
 
 
-            state.view =
+            const selectedView =
                 button.dataset.view;
+
+
+            if (
+                selectedView !== 'date' &&
+                selectedView !== 'month'
+            ) {
+
+                return;
+
+            }
+
+
+            state.view =
+                selectedView;
 
 
             document
@@ -2977,6 +5662,9 @@ if (viewToggle) {
 
                     }
                 );
+
+
+            updateDashboardCards();
 
 
             await refreshAll();
@@ -2996,6 +5684,13 @@ if (dateInput) {
     dateInput.addEventListener(
         'change',
         async () => {
+
+            if (!dateInput.value) {
+
+                return;
+
+            }
+
 
             state.date =
                 dateInput.value;
@@ -3018,6 +5713,13 @@ if (monthInput) {
     monthInput.addEventListener(
         'change',
         async () => {
+
+            if (!monthInput.value) {
+
+                return;
+
+            }
+
 
             state.month =
                 monthInput.value;
@@ -3047,6 +5749,9 @@ async function refreshAll() {
     );
 
 
+    updateDashboardCards();
+
+
     await Promise.all([
 
         loadSales(),
@@ -3055,18 +5760,109 @@ async function refreshAll() {
 
         loadPurchases(),
 
+        loadInventory(),
+
         loadEnquiries(),
 
         loadRepairs(),
 
         loadPayments(),
 
-        loadSummary()
+        loadMasterData(),
+
+        loadSummary(),
+
+        loadRecharges()
 
     ]);
 
 }
 
+// ============================================================
+// SECTION NAVIGATION
+// ============================================================
+
+document
+    .querySelectorAll('.section-nav button')
+    .forEach((button) => {
+
+        button.addEventListener(
+            'click',
+            () => {
+
+                const sectionId =
+                    button.dataset.section;
+
+                const section =
+                    document.getElementById(
+                        sectionId
+                    );
+
+                if (!section) {
+
+                    console.error(
+                        'Section not found:',
+                        sectionId
+                    );
+
+                    return;
+
+                }
+
+                console.log(
+                    'Clicked section:',
+                    sectionId
+                );
+
+
+                // ------------------------------------------------
+                // Stop normal browser anchor behaviour
+                // ------------------------------------------------
+
+                window.history.replaceState(
+                    null,
+                    '',
+                    window.location.pathname
+                );
+
+
+                // ------------------------------------------------
+                // Scroll with a fixed safe position
+                // ------------------------------------------------
+                //
+                // Your top area contains:
+                //
+                // 1. Main header
+                // 2. Navigation buttons
+                //
+                // We intentionally leave enough space for both.
+                // ------------------------------------------------
+
+                const TOP_OFFSET = 300;
+
+
+                const sectionPosition =
+                    section.getBoundingClientRect().top +
+                    window.pageYOffset;
+
+
+                window.scrollTo({
+
+                    top:
+                        Math.max(
+                            0,
+                            sectionPosition -
+                            TOP_OFFSET
+                        ),
+
+                    behavior: 'smooth'
+
+                });
+
+            }
+        );
+
+    });
 
 // ============================================================
 // START APPLICATION
@@ -3076,5 +5872,643 @@ console.log(
     'Shop Ledger app.js loaded successfully'
 );
 
+
+// Set correct dashboard cards immediately.
+
+updateDashboardCards();
+
+// ===============================================================
+// SIM RECHARGE
+// ===============================================================
+
+const rechargeForm = document.getElementById("rechargeForm");
+const rechargeAddForm = document.getElementById("rechargeAddForm");
+
+const rechargeTableBody =
+    document.getElementById("rechargeTableBody");
+
+const rechargeOpening =
+    document.getElementById("rechargeOpening");
+
+const rechargeAdded =
+    document.getElementById("rechargeAdded");
+
+const rechargeUsed =
+    document.getElementById("rechargeUsed");
+
+const rechargeClosing =
+    document.getElementById("rechargeClosing");
+
+
+// ---------------------------------------------------------------
+// LOAD RECHARGE TABLE
+// ---------------------------------------------------------------
+
+async function loadRecharges() {
+
+    if (!rechargeTableBody) {
+        return;
+    }
+
+    try {
+
+        const params = new URLSearchParams();
+
+        if (dateInput && dateInput.value) {
+
+    params.set(
+        "date",
+        dateInput.value
+    );
+
+}
+        else if (
+            state.view === "month" &&
+            monthInput &&
+            monthInput.value
+        ) {
+
+            params.set(
+                "month",
+                monthInput.value
+            );
+        }
+
+        const response = await fetch(
+            `/api/recharge?${params.toString()}`
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+
+            throw new Error(
+                data.error || "Failed to load recharge"
+            );
+        }
+
+        renderRechargeTable(data);
+
+        await loadRechargeSummary();
+
+    } catch (error) {
+
+        console.error(
+            "RECHARGE LOAD ERROR:",
+            error
+        );
+
+        toast(
+            error.message ||
+            "Failed to load recharge data",
+            "error"
+        );
+    }
+}
+
+
+// ---------------------------------------------------------------
+// RENDER RECHARGE TABLE
+// ---------------------------------------------------------------
+
+function renderRechargeTable(rows) {
+
+    if (!rechargeTableBody) {
+        return;
+    }
+
+    if (!rows || rows.length === 0) {
+
+        rechargeTableBody.innerHTML = `
+            <tr>
+                <td colspan="6"
+                    style="text-align:center;padding:20px;">
+                    No recharge transactions found
+                </td>
+            </tr>
+        `;
+
+        return;
+    }
+
+    rechargeTableBody.innerHTML = rows.map(row => {
+
+        const isAdd =
+            row.transaction_type === "ADD";
+
+        const typeText =
+            isAdd
+                ? "Balance Added"
+                : "Recharge Sale";
+
+        const customer =
+            row.customer_name || "-";
+
+        const mobile =
+            row.mobile_number || "-";
+
+        const action = isAdd
+            ? "-"
+            : `
+                <button
+                    type="button"
+                    class="delete-btn"
+                    onclick="deleteRecharge(${row.sale_id})"
+                >
+                    Delete
+                </button>
+            `;
+
+        return `
+            <tr>
+
+                <td>
+                    ${escapeHtml(
+                        row.transaction_date || "-"
+                    )}
+                </td>
+
+                <td>
+                    ${escapeHtml(
+                        row.operator || "-"
+                    )}
+                </td>
+
+                <td>
+                    ${escapeHtml(mobile)}
+                </td>
+
+                <td>
+                    <span class="recharge-type ${
+                        isAdd
+                            ? "recharge-add-type"
+                            : "recharge-sale-type"
+                    }">
+                        ${typeText}
+                    </span>
+                </td>
+
+                <td>
+                    ₹${fmt(row.amount)}
+                </td>
+
+                <td>
+                    ${action}
+                </td>
+
+            </tr>
+        `;
+
+    }).join("");
+}
+
+
+// ---------------------------------------------------------------
+// LOAD RECHARGE BALANCE SUMMARY
+// ---------------------------------------------------------------
+
+async function loadRechargeSummary() {
+
+    if (
+        !rechargeOpening ||
+        !rechargeAdded ||
+        !rechargeUsed ||
+        !rechargeClosing
+    ) {
+        return;
+    }
+
+    try {
+
+        const selectedDate =
+            dateInput && dateInput.value
+                ? dateInput.value
+                : todayStr();
+
+        const response = await fetch(
+            `/api/recharge/summary?date=${encodeURIComponent(
+                selectedDate
+            )}`
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+
+            throw new Error(
+                data.error ||
+                "Failed to load recharge summary"
+            );
+        }
+
+        /*
+         * API returns one object for each operator:
+         *
+         * Jio
+         * Airtel
+         * Vi
+         * BSNL
+         *
+         * Add them together for the overall shop balance.
+         */
+
+        let opening = 0;
+        let added = 0;
+        let used = 0;
+        let closing = 0;
+
+        data.forEach(item => {
+
+            opening += Number(
+                item.opening_balance || 0
+            );
+
+            added += Number(
+                item.added || 0
+            );
+
+            used += Number(
+                item.recharge_sales || 0
+            );
+
+            closing += Number(
+                item.closing_balance || 0
+            );
+
+        });
+
+        rechargeOpening.textContent =
+            `₹${fmt(opening)}`;
+
+        rechargeAdded.textContent =
+            `₹${fmt(added)}`;
+
+        rechargeUsed.textContent =
+            `₹${fmt(used)}`;
+
+        rechargeClosing.textContent =
+            `₹${fmt(closing)}`;
+
+    } catch (error) {
+
+        console.error(
+            "RECHARGE SUMMARY ERROR:",
+            error
+        );
+    }
+}
+
+
+// ---------------------------------------------------------------
+// ADD OPERATOR BALANCE
+// ---------------------------------------------------------------
+
+if (rechargeAddForm) {
+
+    rechargeAddForm.addEventListener(
+        "submit",
+        async function (event) {
+
+            event.preventDefault();
+
+            const operator =
+                document.getElementById(
+                    "addRechargeOperator"
+                ).value;
+
+            const amount =
+                document.getElementById(
+                    "addRechargeAmount"
+                ).value;
+
+            if (!operator) {
+
+                toast(
+                    "Please select operator",
+                    "error"
+                );
+
+                return;
+            }
+
+            if (
+                !amount ||
+                Number(amount) <= 0
+            ) {
+
+                toast(
+                    "Please enter a valid amount",
+                    "error"
+                );
+
+                return;
+            }
+
+            try {
+
+                const response = await fetch(
+                    "/api/recharge/add",
+                    {
+                        method: "POST",
+
+                        headers: {
+                            "Content-Type":
+                                "application/json"
+                        },
+
+                        body: JSON.stringify({
+
+                            transaction_date:
+                                dateInput &&
+                                dateInput.value
+                                    ? dateInput.value
+                                    : todayStr(),
+
+                            operator: operator,
+
+                            amount:
+                                Number(amount)
+
+                        })
+                    }
+                );
+
+                const data =
+                    await response.json();
+
+                if (!response.ok) {
+
+                    throw new Error(
+                        data.error ||
+                        "Failed to add balance"
+                    );
+                }
+
+                toast(
+                    data.message ||
+                    "Operator balance added",
+                    "success"
+                );
+
+                rechargeAddForm.reset();
+
+                await loadRecharges();
+
+                if (typeof loadSummary === "function") {
+                    await loadSummary();
+                }
+
+            } catch (error) {
+
+                console.error(
+                    "ADD RECHARGE BALANCE ERROR:",
+                    error
+                );
+
+                toast(
+                    error.message ||
+                    "Failed to add operator balance",
+                    "error"
+                );
+            }
+
+        }
+    );
+
+}
+
+
+// ---------------------------------------------------------------
+// ADD SIM RECHARGE SALE
+// ---------------------------------------------------------------
+
+if (rechargeForm) {
+
+    rechargeForm.addEventListener(
+        "submit",
+        async function (event) {
+
+            event.preventDefault();
+
+            const customerName =
+                document.getElementById(
+                    "rechargeCustomerName"
+                ).value.trim();
+
+            const mobile =
+                document.getElementById(
+                    "rechargeMobile"
+                ).value.trim();
+
+            const operator =
+                document.getElementById(
+                    "rechargeOperator"
+                ).value;
+
+            const amount =
+                document.getElementById(
+                    "rechargeAmount"
+                ).value;
+
+            if (!mobile) {
+
+                toast(
+                    "Mobile number is required",
+                    "error"
+                );
+
+                return;
+            }
+
+            if (!operator) {
+
+                toast(
+                    "Please select operator",
+                    "error"
+                );
+
+                return;
+            }
+
+            if (
+                !amount ||
+                Number(amount) <= 0
+            ) {
+
+                toast(
+                    "Please enter a valid recharge amount",
+                    "error"
+                );
+
+                return;
+            }
+
+            try {
+
+                const response = await fetch(
+                    "/api/recharge",
+                    {
+                        method: "POST",
+
+                        headers: {
+                            "Content-Type":
+                                "application/json"
+                        },
+
+                        body: JSON.stringify({
+
+                            sale_date:
+                                dateInput &&
+                                dateInput.value
+                                    ? dateInput.value
+                                    : todayStr(),
+
+                            customer_name:
+                                customerName,
+
+                            mobile_number:
+                                mobile,
+
+                            operator:
+                                operator,
+
+                            amount:
+                                Number(amount)
+
+                        })
+                    }
+                );
+
+                const data =
+                    await response.json();
+
+                if (!response.ok) {
+
+                    throw new Error(
+                        data.error ||
+                        "Failed to add recharge"
+                    );
+                }
+
+                toast(
+                    "SIM recharge added successfully",
+                    "success"
+                );
+
+                rechargeForm.reset();
+
+                // Reload recharge table
+                await loadRecharges();
+
+                // Reload dashboard
+                if (typeof loadSummary === "function") {
+
+                    await loadSummary();
+
+                }
+
+                // Reload normal sales section
+                if (typeof loadSales === "function") {
+
+                    await loadSales();
+
+                }
+
+            } catch (error) {
+
+                console.error(
+                    "RECHARGE POST ERROR:",
+                    error
+                );
+
+                toast(
+                    error.message ||
+                    "Failed to add recharge",
+                    "error"
+                );
+            }
+
+        }
+    );
+
+}
+
+
+// ---------------------------------------------------------------
+// DELETE RECHARGE
+// ---------------------------------------------------------------
+
+async function deleteRecharge(saleId) {
+
+    if (!saleId) {
+
+        toast(
+            "Recharge sale ID not found",
+            "error"
+        );
+
+        return;
+    }
+
+    if (
+        !confirm(
+            "Delete this recharge sale?"
+        )
+    ) {
+        return;
+    }
+
+    try {
+
+        const response = await fetch(
+            `/api/recharge/${saleId}`,
+            {
+                method: "DELETE"
+            }
+        );
+
+        const data =
+            await response.json();
+
+        if (!response.ok) {
+
+            throw new Error(
+                data.error ||
+                "Failed to delete recharge"
+            );
+        }
+
+        toast(
+            "Recharge deleted successfully",
+            "success"
+        );
+
+        await loadRecharges();
+
+        if (typeof loadSummary === "function") {
+            await loadSummary();
+        }
+
+        if (typeof loadSales === "function") {
+            await loadSales();
+        }
+
+    } catch (error) {
+
+        console.error(
+            "DELETE RECHARGE ERROR:",
+            error
+        );
+
+        toast(
+            error.message ||
+            "Failed to delete recharge",
+            "error"
+        );
+    }
+}
+
+
+// Load application data.
 
 refreshAll();
