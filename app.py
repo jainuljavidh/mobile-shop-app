@@ -1598,6 +1598,7 @@ def delete_enquiry(enquiry_id):
 REPAIR_STATUSES = [
     "Received",
     "In Progress",
+    "Item Returned",
     "Completed",
     "Delivered to Customer"
 ]
@@ -2250,7 +2251,23 @@ def update_repair_status(repair_id):
             }), 404
 
         # -------------------------------------------------------
-        # Prevent duplicate processing
+        # ITEM RETURNED IS A FINAL STATUS
+        # -------------------------------------------------------
+
+        if (
+            repair["status"] == "Item Returned"
+            and new_status != "Item Returned"
+        ):
+
+            return jsonify({
+                "error": (
+                    "Item Returned is a final status and "
+                    "cannot be changed back"
+                )
+            }), 400
+
+        # -------------------------------------------------------
+        # PREVENT DUPLICATE DELIVERY PROCESSING
         # -------------------------------------------------------
 
         if (
@@ -2266,12 +2283,71 @@ def update_repair_status(repair_id):
             }), 400
 
         # -------------------------------------------------------
+        # ITEM RETURNED PROCESS
+        # -------------------------------------------------------
+        # Phone is dead / not recoverable, so the item is returned
+        # to the customer without completing the repair.
+        #
+        # Important:
+        # - Do NOT reduce part stock.
+        # - Do NOT create a sales record.
+        # - Close the repair by storing the return time in delivered_at.
+        #   This existing field is used as the close/return timestamp so
+        #   the repair does not remain in the pending list.
+        # -------------------------------------------------------
+
+        if new_status == "Item Returned":
+
+            cur.execute(
+                """
+                UPDATE repairs
+                SET
+                    amount = %s,
+                    advance = %s,
+                    status = %s,
+                    delivered_at = COALESCE(
+                        delivered_at,
+                        %s
+                    )
+                WHERE id = %s
+                """,
+                (
+                    final_amount,
+                    total_received,
+                    new_status,
+                    datetime.now(IST).replace(tzinfo=None),
+                    repair_id
+                )
+            )
+
+            conn.commit()
+
+            return jsonify({
+                "message": "Item returned successfully. No sale or stock change was made.",
+                "repair_id": repair_id,
+                "status": new_status,
+                "stock_reduced": int(repair["stock_reduced"] or 0),
+                "sales_recorded": int(repair["sales_recorded"] or 0)
+            })
+
+        # -------------------------------------------------------
         # DELIVERY PROCESS
         # -------------------------------------------------------
 
         if new_status == "Delivered to Customer":
 
-            amount = to_float(
+            # ---------------------------------------------------
+            # ORIGINAL / QUOTED REPAIR AMOUNT
+            # ---------------------------------------------------
+            # Example: repair amount = 2000
+            # Customer negotiates a discount at delivery and
+            # finally pays 1800.
+            #
+            # The frontend sends final_amount = 1800.
+            # Sales/dashboard must record 1800, not 2000.
+            # ---------------------------------------------------
+
+            quoted_amount = to_float(
                 repair["amount"]
             )
 
@@ -2279,7 +2355,45 @@ def update_repair_status(repair_id):
                 repair["advance"]
             )
 
-            remaining = amount - advance
+            raw_final_amount = data.get("final_amount")
+
+            try:
+                final_amount = to_float(raw_final_amount)
+            except (ValueError, TypeError):
+                return jsonify({
+                    "error": "Enter a valid final repair amount"
+                }), 400
+
+            # Final amount must be non-negative and cannot be
+            # greater than the originally quoted repair amount.
+            if final_amount < 0:
+                return jsonify({
+                    "error": "Final repair amount cannot be negative"
+                }), 400
+
+            if final_amount > quoted_amount:
+                return jsonify({
+                    "error": (
+                        f"Final repair amount cannot be greater than "
+                        f"the quoted amount of ₹{quoted_amount:.2f}"
+                    )
+                }), 400
+
+            # If an advance was already collected, the discounted
+            # final amount cannot be below the amount already paid.
+            if final_amount < advance:
+                return jsonify({
+                    "error": (
+                        f"Final repair amount cannot be less than the "
+                        f"advance already received of ₹{advance:.2f}"
+                    )
+                }), 400
+
+            # Customer is completing the payment at delivery.
+            # The final amount becomes the actual amount received
+            # for this repair.
+            remaining = 0
+            total_received = final_amount
 
             # ===================================================
             # 1. REDUCE PART STOCK
@@ -2375,24 +2489,22 @@ def update_repair_status(repair_id):
                 # collects the phone (Delivered to Customer).
                 # The ORIGINAL repair date is not used for sales.
                 #
-                # Sales/dashboard must record the FULL repair amount
-                # on the DELIVERY DATE.
+                # Sales/dashboard must record the FINAL amount the
+                # customer actually pays on the DELIVERY DATE.
                 #
                 # Example:
-                #   Repair date = 2026-09-22
-                #   Repair amount = 2000
-                #   Advance = 1000
-                #   Delivery date = 2026-09-23
+                #   Quoted repair amount = 2000
+                #   Customer discount   = 200
+                #   Final amount paid    = 1800
                 #
-                #   2026-09-22 Sales = 0 for this repair
-                #   2026-09-23 Sales = 2000 for this repair
+                #   Delivery-day Sales = 1800
                 #
-                # Later balance payments must NOT increase the sales
-                # total again, otherwise the repair would be counted
-                # more than once.
+                # The quoted amount is replaced by the final amount
+                # for the completed transaction so the repair balance
+                # also becomes zero.
                 # ------------------------------------------------
 
-                received_amount = amount
+                received_amount = final_amount
 
                 cur.execute(
                     """
@@ -2466,9 +2578,11 @@ def update_repair_status(repair_id):
             return jsonify({
                 "message": "Repair delivered successfully",
                 "repair_id": repair_id,
-                "amount": amount,
-                "advance": advance,
-                "received_amount": amount,
+                "quoted_amount": quoted_amount,
+                "discount": round(quoted_amount - final_amount, 2),
+                "amount": final_amount,
+                "advance": total_received,
+                "received_amount": final_amount,
                 "balance": remaining,
                 "stock_reduced": True,
                 "sales_recorded": True
@@ -2827,10 +2941,19 @@ def get_payments():
                 """
                 SELECT *
                 FROM payments
-                WHERE payment_date = %s
-                ORDER BY id DESC
+                WHERE (
+                    payment_date = %s
+                    OR (
+                        payment_date < %s
+                        AND balance_amount > 0
+                    )
+                )
+                ORDER BY
+                    (balance_amount > 0) DESC,
+                    payment_date DESC,
+                    id DESC
                 """,
-                (d,)
+                (d, d)
             )
 
         elif m:
@@ -3447,8 +3570,15 @@ def summary():
         # TODAY PAYMENT BALANCE
         # =======================================================
         #
-        # This is the pending amount for payment records
-        # on the selected date.
+        # Show ALL outstanding customer balances up to the
+        # selected date. An unpaid balance therefore carries
+        # forward and remains visible every day until it is paid.
+        #
+        # Example:
+        #   23-Sep: Total ₹2,000, Paid ₹1,000, Balance ₹1,000
+        #   24-Sep: Balance still ₹1,000
+        #   Customer pays the remaining ₹1,000
+        #   24-Sep dashboard pending becomes ₹0
         # =======================================================
 
         today_payment_balance = scalar(
@@ -3458,7 +3588,8 @@ def summary():
                 0
             ) AS total
             FROM payments
-            WHERE payment_date = %s
+            WHERE payment_date <= %s
+              AND balance_amount > 0
             """,
             (d,)
         )
@@ -3612,7 +3743,10 @@ def summary():
             """
             SELECT COUNT(*) AS total
             FROM repairs
-            WHERE status != 'Delivered to Customer'
+            WHERE status NOT IN (
+                'Delivered to Customer',
+                'Item Returned'
+            )
             """
         )
 

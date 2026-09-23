@@ -314,11 +314,118 @@ const REPAIR_STATUSES = [
 
     'In Progress',
 
+    'Item Returned',
+
     'Completed',
 
     'Delivered to Customer'
 
 ];
+
+
+// ============================================================
+// REPAIR STATUS FLOW
+// ============================================================
+//
+// Received
+//      ↓
+// In Progress
+//      ↓
+// ┌───────────────┐
+// │               │
+// ▼               ▼
+// Item Returned   Completed
+// (dead /         ↓
+// not recoverable) Delivered to Customer
+//
+// Item Returned and Delivered to Customer are final statuses.
+// A repair cannot move backwards after reaching either final
+// status.
+// ============================================================
+
+const REPAIR_STATUS_FLOW = {
+
+    'Received': [
+        'Received',
+        'In Progress'
+    ],
+
+    'In Progress': [
+        'In Progress',
+        'Item Returned',
+        'Completed'
+    ],
+
+    'Item Returned': [
+        'Item Returned'
+    ],
+
+    'Completed': [
+        'Completed',
+        'Delivered to Customer'
+    ],
+
+    'Delivered to Customer': [
+        'Delivered to Customer'
+    ]
+
+};
+
+
+function getAllowedRepairStatuses(currentStatus) {
+
+    const allowed =
+        REPAIR_STATUS_FLOW[currentStatus];
+
+
+    if (Array.isArray(allowed) && allowed.length > 0) {
+
+        return allowed;
+
+    }
+
+
+    // Backward compatibility for unexpected/older status values.
+    return [currentStatus].filter(Boolean);
+
+}
+
+
+function populateRepairStatusFilter() {
+
+    if (!repairStatusFilter) {
+        return;
+    }
+
+
+    const previousValue =
+        repairStatusFilter.value;
+
+
+    repairStatusFilter.innerHTML = `
+        <option value="All">All</option>
+        ${REPAIR_STATUSES
+            .map((status) =>
+                `<option value="${escapeHtml(status)}">${escapeHtml(status)}</option>`
+            )
+            .join('')}
+    `;
+
+
+    if (
+        REPAIR_STATUSES.includes(previousValue)
+    ) {
+
+        repairStatusFilter.value =
+            previousValue;
+
+    } else {
+
+        repairStatusFilter.value = 'All';
+
+    }
+
+}
 
 
 // ============================================================
@@ -334,6 +441,8 @@ const repairSearch =
 
 const repairStatusFilter =
     document.getElementById('repairStatusFilter');
+
+populateRepairStatusFilter();
 
 // ============================================================
 // DASHBOARD CARD VIEW
@@ -3889,8 +3998,14 @@ function renderRepairsTable() {
         // STATUS OPTIONS
         // ----------------------------------------------------
 
+        const allowedStatuses =
+            getAllowedRepairStatuses(
+                String(r.status || 'Received')
+            );
+
+
         const statusOptions =
-            REPAIR_STATUSES
+            allowedStatuses
                 .map(
                     (status) => {
 
@@ -4035,19 +4150,26 @@ function renderRepairsTable() {
                     const newStatus =
                         e.target.value;
 
+                    const currentStatus =
+                        String(r.status || 'Received');
+
+
+                    const allowedStatuses =
+                        getAllowedRepairStatuses(
+                            currentStatus
+                        );
+
 
                     // ----------------------------------------
-                    // DELIVERED REPAIR CANNOT GO BACK
+                    // ENFORCE THE REPAIR WORKFLOW
                     // ----------------------------------------
 
                     if (
-                        Number(r.sales_recorded) === 1 &&
-                        newStatus !==
-                            'Delivered to Customer'
+                        !allowedStatuses.includes(newStatus)
                     ) {
 
                         toast(
-                            'Delivered repair cannot be moved back.',
+                            `Cannot change status from ${currentStatus} to ${newStatus}.`,
                             true
                         );
 
@@ -4061,19 +4183,88 @@ function renderRepairsTable() {
 
 
                     // ----------------------------------------
+                    // FINAL STATUS PROTECTION
+                    // ----------------------------------------
+
+                    if (
+                        (
+                            currentStatus ===
+                                'Item Returned' ||
+                            Number(r.sales_recorded) === 1
+                        ) &&
+                        newStatus !== currentStatus
+                    ) {
+
+                        toast(
+                            currentStatus === 'Item Returned'
+                                ? 'Item Returned is a final status and cannot be changed.'
+                                : 'Delivered repair cannot be moved back.',
+                            true
+                        );
+
+
+                        await loadRepairs();
+
+
+                        return;
+
+                    }
+
+
+                    // ----------------------------------------
+                    // ITEM RETURNED CONFIRMATION
+                    // ----------------------------------------
+
+                    if (
+                        newStatus ===
+                        'Item Returned'
+                    ) {
+
+                        const confirmReturn =
+                            confirm(
+                                'Mark this repair as Item Returned?\n\n' +
+                                'Use this when the phone is dead or cannot be repaired.\n\n' +
+                                'No repair sale will be created.\n' +
+                                'Part stock will not be reduced.\n' +
+                                'This is a final status.'
+                            );
+
+
+                        if (!confirmReturn) {
+
+                            await loadRepairs();
+
+
+                            return;
+
+                        }
+
+                    }
+
+
+                    // ----------------------------------------
                     // DELIVERY CONFIRMATION
                     // ----------------------------------------
+
+                    let finalRepairAmount = null;
+
 
                     if (
                         newStatus ===
                         'Delivered to Customer'
                     ) {
 
+                        const quotedAmount =
+                            Number(r.amount) || 0;
+
+                        const currentAdvance =
+                            Number(r.advance) || 0;
+
                         const confirmDelivery =
                             confirm(
                                 'Mark this repair as Delivered to Customer?\n\n' +
                                 'If a part was requested, stock will be reduced.\n' +
-                                'The repair will also be recorded as a sale.'
+                                'The final amount paid by the customer will be recorded in Sales and Dashboard.'
                             );
 
 
@@ -4081,6 +4272,87 @@ function renderRepairsTable() {
 
                             await loadRepairs();
 
+
+                            return;
+
+                        }
+
+
+                        // ------------------------------------------------
+                        // ASK FOR FINAL CUSTOMER AMOUNT
+                        // ------------------------------------------------
+                        // Example:
+                        // Quoted amount = 2000
+                        // Customer negotiates discount
+                        // Final payment = 1800
+                        //
+                        // Only 1800 will be recorded in Sales/Dashboard.
+                        // ------------------------------------------------
+
+                        const enteredAmount =
+                            window.prompt(
+                                `Original repair amount: ${fmt(quotedAmount)}\n` +
+                                `Advance already received: ${fmt(currentAdvance)}\n\n` +
+                                'Enter the FINAL amount agreed with the customer:',
+                                quotedAmount.toFixed(2)
+                            );
+
+
+                        if (enteredAmount === null) {
+
+                            await loadRepairs();
+
+
+                            return;
+
+                        }
+
+
+                        finalRepairAmount =
+                            Number(
+                                String(enteredAmount).trim()
+                            );
+
+
+                        if (
+                            !Number.isFinite(finalRepairAmount) ||
+                            finalRepairAmount < 0
+                        ) {
+
+                            toast(
+                                'Please enter a valid final repair amount.',
+                                true
+                            );
+
+                            await loadRepairs();
+
+                            return;
+
+                        }
+
+
+                        if (finalRepairAmount > quotedAmount) {
+
+                            toast(
+                                `Final amount cannot be greater than ${fmt(quotedAmount)}.`,
+                                true
+                            );
+
+                            await loadRepairs();
+
+                            return;
+
+                        }
+
+
+                        if (finalRepairAmount < currentAdvance) {
+
+                            toast(
+                                `Final amount cannot be less than the advance already received of ${fmt(currentAdvance)}.`,
+                                true
+                            );
+
+                            await loadRepairs();
 
                             return;
 
@@ -4102,7 +4374,15 @@ function renderRepairsTable() {
                                         JSON.stringify({
 
                                             status:
-                                                newStatus
+                                                newStatus,
+
+                                            ...(newStatus ===
+                                                'Delivered to Customer'
+                                                ? {
+                                                    final_amount:
+                                                        finalRepairAmount
+                                                }
+                                                : {})
 
                                         })
 
@@ -4115,14 +4395,45 @@ function renderRepairsTable() {
                             'Delivered to Customer'
                         ) {
 
-                            const deliveryBalance =
+                            const deliveryAmount =
                                 Number(
-                                    result.balance
+                                    result.received_amount
+                                ) || 0;
+
+                            const quotedAmount =
+                                Number(
+                                    result.quoted_amount
+                                ) || deliveryAmount;
+
+                            const discount =
+                                Number(
+                                    result.discount
                                 ) || 0;
 
 
+                            if (discount > 0) {
+
+                                toast(
+                                    `Repair delivered. Customer paid ${fmt(deliveryAmount)} after ${fmt(discount)} discount.`
+                                );
+
+                            } else {
+
+                                toast(
+                                    `Repair delivered. Sales recorded: ${fmt(deliveryAmount)}`
+                                );
+
+                            }
+
+                        }
+
+                        else if (
+                            newStatus ===
+                            'Item Returned'
+                        ) {
+
                             toast(
-                                `Repair delivered. Balance: ${fmt(deliveryBalance)}`
+                                'Item returned. No sale or stock change was made.'
                             );
 
                         }
@@ -4310,6 +4621,15 @@ function openRepairDetails(repair) {
 
     const balance = Math.max(0, amount - advance);
 
+    const closingDateLabel =
+        repair.status === 'Item Returned'
+            ? 'Returned Date &amp; Time'
+            : 'Delivered Date &amp; Time';
+
+    const closingDateTime =
+        repair.returned_at ||
+        repair.delivered_at;
+
     content.innerHTML = `
 
         <div class="repair-detail-grid">
@@ -4336,7 +4656,7 @@ function openRepairDetails(repair) {
 
             <div class="repair-time-detail"><span>Received Date &amp; Time</span><strong>${formatRepairDateTime(repair.received_at)}</strong></div>
 
-            <div class="repair-time-detail"><span>Delivered Date &amp; Time</span><strong>${formatRepairDateTime(repair.delivered_at)}</strong></div>
+            <div class="repair-time-detail"><span>${closingDateLabel}</span><strong>${formatRepairDateTime(closingDateTime)}</strong></div>
 
         </div>
 
