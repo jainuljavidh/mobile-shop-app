@@ -1664,22 +1664,27 @@ def get_repairs():
                 FROM repairs
                 WHERE
                 (
+                    -- Repairs received on the selected date.
                     repair_date = %s
+
                     OR
+
+                    -- Older repairs stay visible only while they
+                    -- have not yet been delivered.
                     (
                         repair_date < %s
-                        AND status <> 'Delivered to Customer'
+                        AND delivered_at IS NULL
                     )
+
                     OR
-                    (
-                        delivered_at >= %s
-                        AND delivered_at < DATE_ADD(%s, INTERVAL 1 DAY)
-                    )
+
+                    -- A delivered repair is visible on its
+                    -- actual delivery date only.
+                    DATE(delivered_at) = %s
                 )
                 ORDER BY id DESC
                 """,
                 (
-                    d,
                     d,
                     d,
                     d
