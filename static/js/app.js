@@ -1905,6 +1905,172 @@ let masterCategories = [];
 let masterModels = [];
 let masterParts = [];
 
+// ============================================================
+// REPAIR - MASTER CATEGORY + MODEL DROPDOWN
+// ============================================================
+
+function setupRepairCategoryModelDropdown() {
+
+    if (!repairsForm) {
+        return;
+    }
+
+    const modelField =
+        repairsForm.elements['model'];
+
+    const productField =
+        repairsForm.elements['product_name'];
+
+    if (!modelField || !productField) {
+        return;
+    }
+
+    // --------------------------------------------------------
+    // Create SELECT for Repair Model
+    // --------------------------------------------------------
+
+    let repairModelSelect =
+        document.getElementById(
+            'repairMasterModel'
+        );
+
+    if (!repairModelSelect) {
+
+        repairModelSelect =
+            document.createElement('select');
+
+        repairModelSelect.id =
+            'repairMasterModel';
+
+        repairModelSelect.name =
+            'model';
+
+        repairModelSelect.className =
+            modelField.className || '';
+
+        repairModelSelect.required =
+            modelField.required;
+
+        repairModelSelect.style.width =
+            '100%';
+
+        modelField.parentNode.replaceChild(
+            repairModelSelect,
+            modelField
+        );
+    }
+
+    // --------------------------------------------------------
+    // Clear dropdown
+    // --------------------------------------------------------
+
+    repairModelSelect.innerHTML =
+        '<option value="">Select Category / Model</option>';
+
+    // --------------------------------------------------------
+    // Add Master Category + Model
+    // --------------------------------------------------------
+
+    if (
+        !Array.isArray(masterCategories) ||
+        !Array.isArray(masterModels)
+    ) {
+        return;
+    }
+
+    masterCategories.forEach(
+        (category) => {
+
+            const categoryModels =
+                masterModels
+                    .filter(
+                        (model) =>
+                            String(
+                                model.category_id
+                            ) ===
+                            String(
+                                category.id
+                            )
+                    )
+                    .sort(
+                        (a, b) =>
+                            String(
+                                a.name || ''
+                            ).localeCompare(
+                                String(
+                                    b.name || ''
+                                )
+                            )
+                    );
+
+            categoryModels.forEach(
+                (model) => {
+
+                    const option =
+                        document.createElement(
+                            'option'
+                        );
+
+                    // Actual value saved in database
+                    option.value =
+                        model.name;
+
+                    // Visible text
+                    // Example: Vivo Y20
+                    option.textContent =
+                        `${category.name} ${model.name}`;
+
+                    // Store category
+                    option.dataset.category =
+                        category.name;
+
+                    // Store IDs
+                    option.dataset.categoryId =
+                        category.id;
+
+                    option.dataset.modelId =
+                        model.id;
+
+                    repairModelSelect.appendChild(
+                        option
+                    );
+                }
+            );
+        }
+    );
+
+    repairModelSelect.disabled =
+        repairModelSelect.options.length <= 1;
+
+    // --------------------------------------------------------
+    // When user selects Vivo Y20
+    // --------------------------------------------------------
+
+    repairModelSelect.onchange =
+        function () {
+
+            const selectedOption =
+                this.options[
+                    this.selectedIndex
+                ];
+
+            if (
+                !selectedOption ||
+                !selectedOption.value
+            ) {
+
+                productField.value = '';
+
+                return;
+            }
+
+            // Automatically put category into Product
+            productField.value =
+                selectedOption.dataset.category || '';
+
+        };
+}
+
 const masterCategoryForm =
     document.getElementById('masterCategoryForm');
 
@@ -2272,6 +2438,8 @@ async function loadMasterData() {
             Array.isArray(data.parts)
                 ? data.parts
                 : [];
+
+                setupRepairCategoryModelDropdown();
 
         populateMasterCategorySelect(
             masterModelCategory
