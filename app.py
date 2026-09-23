@@ -25,8 +25,8 @@ DB_CONFIG = {
     "user": os.environ.get("DB_USER", "root"),
     "password": os.environ.get("DB_PASSWORD", "root123"),
     "database": os.environ.get("DB_NAME", "mobile_shop"),
-    "use_pure": True,
 }
+
 pool = pooling.MySQLConnectionPool(
     pool_name="shop_pool",
     pool_size=20,
@@ -106,12 +106,6 @@ def get_sales():
                 CASE
                     WHEN s.sale_type = 'Repair'
                          AND s.repair_id IS NOT NULL
-                    THEN COALESCE(r.amount, s.total_amount)
-                    ELSE s.total_amount
-                END AS actual_amount,
-                CASE
-                    WHEN s.sale_type = 'Repair'
-                         AND s.repair_id IS NOT NULL
                     THEN GREATEST(
                         COALESCE(r.amount, 0)
                         - COALESCE(r.advance, 0),
@@ -158,9 +152,6 @@ def get_sales():
             row["recharge_mobile"] = row.get("recharge_mobile") or ""
             row["recharge_id"] = row.get("recharge_id")
             row["repair_id"] = row.get("repair_id")
-            row["actual_amount"] = to_float(
-                row.get("actual_amount")
-            )
             row["repair_balance"] = to_float(
                 row.get("repair_balance")
             )
@@ -254,40 +245,42 @@ def add_sale():
 
         inventory = cur.fetchone()
 
-        # A product can be sold even when it does not yet exist in
-        # inventory. In that case, record the sale only and do not
-        # change inventory. If the product exists, keep the normal
-        # stock/negative-stock rules.
-        if inventory:
+        if not inventory:
+            conn.rollback()
 
-            current_stock = int(
-                inventory["quantity"] or 0
-            )
+            return jsonify({
+                "error":
+                    f"Product '{product_name}' is not available in inventory"
+            }), 400
 
-            # ---------------------------------------------------
-            # STOCK CHECK
-            #
-            # Normal:
-            #   Stock 5, Sale 10 -> BLOCK
-            #
-            # Negative stock enabled:
-            #   Stock 5, Sale 10 -> ALLOW -> Stock -5
-            # ---------------------------------------------------
+        current_stock = int(
+            inventory["quantity"] or 0
+        )
 
-            if (
-                current_stock < quantity
-                and not allow_negative_stock
-            ):
-                conn.rollback()
+        # -------------------------------------------------------
+        # STOCK CHECK
+        #
+        # Normal:
+        #   Stock 5, Sale 10 -> BLOCK
+        #
+        # Negative stock enabled:
+        #   Stock 5, Sale 10 -> ALLOW -> Stock -5
+        # -------------------------------------------------------
 
-                return jsonify({
-                    "error": (
-                        f"Insufficient stock for '{product_name}'. "
-                        f"Available: {current_stock}, "
-                        f"Required: {quantity}. "
-                        f"Enable 'Allow Negative Stock' to continue."
-                    )
-                }), 400
+        if (
+            current_stock < quantity
+            and not allow_negative_stock
+        ):
+            conn.rollback()
+
+            return jsonify({
+                "error": (
+                    f"Insufficient stock for '{product_name}'. "
+                    f"Available: {current_stock}, "
+                    f"Required: {quantity}. "
+                    f"Enable 'Allow Negative Stock' to continue."
+                )
+            }), 400
 
         # -------------------------------------------------------
         # Insert sale
@@ -314,20 +307,20 @@ def add_sale():
         ))
 
         # -------------------------------------------------------
-        # Reduce stock only when the product exists in inventory.
-        # New products are allowed to be sold without an inventory
-        # record, so there is nothing to update in that case.
+        # Reduce stock
+        #
+        # This intentionally permits a negative result when
+        # allow_negative_stock=True.
         # -------------------------------------------------------
 
-        if inventory:
-            cur.execute("""
-                UPDATE inventory
-                SET quantity = quantity - %s
-                WHERE id = %s
-            """, (
-                quantity,
-                inventory["id"]
-            ))
+        cur.execute("""
+            UPDATE inventory
+            SET quantity = quantity - %s
+            WHERE id = %s
+        """, (
+            quantity,
+            inventory["id"]
+        ))
 
         conn.commit()
 
@@ -469,24 +462,37 @@ def update_sale(sale_id):
 
         old_inventory = cur.fetchone()
 
-        # If the old product exists in inventory, return the old
-        # quantity before applying the edited sale. If it does not
-        # exist, simply leave inventory unchanged.
-        if old_inventory:
+        if not old_inventory:
 
-            cur.execute("""
-                UPDATE inventory
-                SET quantity = quantity + %s
-                WHERE id = %s
-            """, (
-                old_quantity,
-                old_inventory["id"]
-            ))
+            conn.rollback()
+
+            return jsonify({
+                "error": (
+                    f"Old product '{old_product_name}' "
+                    "was not found in inventory"
+                )
+            }), 400
 
         # -------------------------------------------------------
-        # Lock the NEW inventory row when the product is changed.
-        # A new product that is not in inventory is also allowed;
-        # in that case the sale is recorded without stock movement.
+        # Return OLD sale quantity back to stock
+        #
+        # Example:
+        #   Current stock = -5
+        #   Old sale = 10
+        #   Restored stock = 5
+        # -------------------------------------------------------
+
+        cur.execute("""
+            UPDATE inventory
+            SET quantity = quantity + %s
+            WHERE id = %s
+        """, (
+            old_quantity,
+            old_inventory["id"]
+        ))
+
+        # -------------------------------------------------------
+        # If product is changed, lock the NEW inventory row
         # -------------------------------------------------------
 
         if old_product_name != new_product_name:
@@ -507,59 +513,72 @@ def update_sale(sale_id):
 
             new_inventory = cur.fetchone()
 
-        else:
-
-            new_inventory = old_inventory
-
-            # The old sale quantity was just restored in the database.
-            # Reflect that restored quantity in the local row for the
-            # stock check below.
-            if new_inventory:
-                current_quantity = int(
-                    new_inventory["quantity"] or 0
-                )
-
-                new_inventory["quantity"] = (
-                    current_quantity + old_quantity
-                )
-
-        # -------------------------------------------------------
-        # Check NEW stock only when the new product exists in
-        # inventory. Missing inventory means this is a new product
-        # sale, so no stock check is required.
-        # -------------------------------------------------------
-
-        if new_inventory:
-
-            current_stock = int(
-                new_inventory["quantity"] or 0
-            )
-
-            if (
-                current_stock < new_quantity
-                and not allow_negative_stock
-            ):
+            if not new_inventory:
 
                 conn.rollback()
 
                 return jsonify({
                     "error": (
-                        f"Insufficient stock for '{new_product_name}'. "
-                        f"Available: {current_stock}, "
-                        f"Required: {new_quantity}. "
-                        f"Enable 'Allow Negative Stock' to continue."
+                        f"New product '{new_product_name}' "
+                        "was not found in inventory"
                     )
                 }), 400
 
-            # Deduct new sale quantity from existing inventory.
-            cur.execute("""
-                UPDATE inventory
-                SET quantity = quantity - %s
-                WHERE id = %s
-            """, (
-                new_quantity,
-                new_inventory["id"]
-            ))
+        else:
+
+            new_inventory = old_inventory
+
+            # Re-read the quantity after restoring the old sale.
+            # This keeps the stock check accurate for same-product
+            # edits.
+            current_quantity = int(
+                old_inventory["quantity"] or 0
+            )
+
+            restored_quantity = (
+                current_quantity + old_quantity
+            )
+
+            new_inventory["quantity"] = (
+                restored_quantity
+            )
+
+        # -------------------------------------------------------
+        # Check NEW stock
+        # -------------------------------------------------------
+
+        current_stock = int(
+            new_inventory["quantity"] or 0
+        )
+
+        if (
+            current_stock < new_quantity
+            and not allow_negative_stock
+        ):
+
+            conn.rollback()
+
+            return jsonify({
+                "error": (
+                    f"Insufficient stock for '{new_product_name}'. "
+                    f"Available: {current_stock}, "
+                    f"Required: {new_quantity}. "
+                    f"Enable 'Allow Negative Stock' to continue."
+                )
+            }), 400
+
+        # -------------------------------------------------------
+        # Deduct NEW sale quantity
+        # -------------------------------------------------------
+
+        cur.execute("""
+            UPDATE inventory
+            SET quantity = quantity - %s
+            WHERE id = %s
+        """, (
+            new_quantity,
+            new_inventory["id"]
+        ))
 
         # -------------------------------------------------------
         # Update sale
@@ -1643,10 +1662,28 @@ def get_repairs():
                     delivered_at,
                     created_at
                 FROM repairs
-                WHERE repair_date = %s
+                WHERE
+                (
+                    repair_date = %s
+                    OR
+                    (
+                        repair_date < %s
+                        AND status <> 'Delivered to Customer'
+                    )
+                    OR
+                    (
+                        delivered_at >= %s
+                        AND delivered_at < DATE_ADD(%s, INTERVAL 1 DAY)
+                    )
+                )
                 ORDER BY id DESC
                 """,
-                (d,)
+                (
+                    d,
+                    d,
+                    d,
+                    d
+                )
             )
 
         elif m:
@@ -2347,21 +2384,30 @@ def update_repair_status(repair_id):
             if int(repair["sales_recorded"] or 0) == 0:
 
                 # ------------------------------------------------
-                # IMPORTANT PAYMENT LOGIC
+                # IMPORTANT REPAIR SALES LOGIC
                 #
-                # Repair amount = full charge to customer.
-                # Advance = amount actually received so far.
+                # The repair becomes a sale only when the customer
+                # collects the phone (Delivered to Customer).
+                # The ORIGINAL repair date is not used for sales.
                 #
-                # Sales/dashboard must record only the money
-                # actually received, not the full repair amount.
+                # Sales/dashboard must record the FULL repair amount
+                # on the DELIVERY DATE.
+                #
                 # Example:
+                #   Repair date = 2026-09-22
                 #   Repair amount = 2000
-                #   Advance      = 1000
-                #   Sales total  = 1000
-                #   Balance      = 1000
+                #   Advance = 1000
+                #   Delivery date = 2026-09-23
+                #
+                #   2026-09-22 Sales = 0 for this repair
+                #   2026-09-23 Sales = 2000 for this repair
+                #
+                # Later balance payments must NOT increase the sales
+                # total again, otherwise the repair would be counted
+                # more than once.
                 # ------------------------------------------------
 
-                received_amount = advance
+                received_amount = amount
 
                 cur.execute(
                     """
@@ -2437,7 +2483,7 @@ def update_repair_status(repair_id):
                 "repair_id": repair_id,
                 "amount": amount,
                 "advance": advance,
-                "received_amount": advance,
+                "received_amount": amount,
                 "balance": remaining,
                 "stock_reduced": True,
                 "sales_recorded": True
@@ -2584,19 +2630,20 @@ def add_repair_balance_payment(repair_id):
             }), 400
 
         # -------------------------------------------------------
-        # Lock the existing repair sale row.
-        # The first sale record stores the original advance in
-        # amount. Later balance payments accumulate in split_amount.
-        # total_amount always represents money actually received.
+        # Repair sales logic
+        # -------------------------------------------------------
+        # The repair sale was already created at DELIVERY using
+        # the FULL repair amount and the delivery date.
+        #
+        # Therefore, a later balance payment must update only the
+        # repair's advance/balance. It must NOT change sales.total_amount.
+        # Otherwise the same repair would be counted again in the
+        # dashboard and sales totals.
         # -------------------------------------------------------
 
         cur.execute(
             """
-            SELECT
-                id,
-                amount,
-                split_amount,
-                total_amount
+            SELECT id
             FROM sales
             WHERE repair_id = %s
               AND sale_type = 'Repair'
@@ -2613,23 +2660,6 @@ def add_repair_balance_payment(repair_id):
             return jsonify({
                 "error": "Repair sale record was not found"
             }), 400
-
-        sale_amount = to_float(sale["amount"])
-        old_split = to_float(sale["split_amount"])
-        old_total = to_float(sale["total_amount"])
-
-        # If the sale row already contains a received amount,
-        # add the new payment to that exact value. This keeps the
-        # dashboard total equal to the actual cash received.
-        new_total = round(
-            old_total + payment_amount,
-            2
-        )
-
-        new_split = round(
-            new_total - sale_amount,
-            2
-        )
 
         new_paid = round(
             paid_so_far + payment_amount,
@@ -2653,28 +2683,13 @@ def add_repair_balance_payment(repair_id):
             )
         )
 
-        cur.execute(
-            """
-            UPDATE sales
-            SET
-                split_amount = %s,
-                total_amount = %s
-            WHERE id = %s
-            """,
-            (
-                new_split,
-                new_total,
-                sale["id"]
-            )
-        )
-
         conn.commit()
 
         return jsonify({
             "message": "Repair balance payment recorded successfully",
             "repair_id": repair_id,
             "payment_received": payment_amount,
-            "total_received": new_total,
+            "total_received": new_paid,
             "balance": new_balance
         })
 
