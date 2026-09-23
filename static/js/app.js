@@ -6101,16 +6101,9 @@ async function loadRechargeSummary() {
             );
         }
 
-        /*
-         * API returns one object for each operator:
-         *
-         * Jio
-         * Airtel
-         * Vi
-         * BSNL
-         *
-         * Add them together for the overall shop balance.
-         */
+        // ---------------------------------------------------------
+        // OVERALL SHOP RECHARGE SUMMARY
+        // ---------------------------------------------------------
 
         let opening = 0;
         let added = 0;
@@ -6148,6 +6141,60 @@ async function loadRechargeSummary() {
 
         rechargeClosing.textContent =
             `₹${fmt(closing)}`;
+
+
+        // ---------------------------------------------------------
+        // OPERATOR WALLET BALANCE
+        // ---------------------------------------------------------
+
+        const walletList =
+            document.getElementById(
+                "operatorBalanceList"
+            );
+
+        if (walletList) {
+
+            const operators = [
+                "Jio",
+                "Airtel",
+                "Vi",
+                "BSNL"
+            ];
+
+            walletList.innerHTML = operators.map(operator => {
+
+                const item =
+                    data.find(
+                        row =>
+                            String(row.operator || "")
+                                .toLowerCase() ===
+                            operator.toLowerCase()
+                    );
+
+                const balance =
+                    item
+                        ? Number(
+                            item.closing_balance || 0
+                        )
+                        : 0;
+
+                return `
+                    <div class="operator-balance-card">
+
+                        <div class="operator-balance-name">
+                            ${escapeHtml(operator)}
+                        </div>
+
+                        <div class="operator-balance-amount">
+                            ₹${fmt(balance)}
+                        </div>
+
+                    </div>
+                `;
+
+            }).join("");
+
+        }
 
     } catch (error) {
 
