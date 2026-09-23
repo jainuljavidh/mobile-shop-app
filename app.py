@@ -194,11 +194,8 @@ def add_sale():
 
     total_amount = amount + split_amount
 
-    # IMPORTANT:
-    # Negative stock is allowed ONLY when the frontend sends
+    # Negative stock is allowed only when the frontend sends
     # a real JSON boolean: true.
-    #
-    # Missing value / false / 0 / "true" / "1" are NOT accepted.
     allow_negative_stock = (
         data.get("allow_negative_stock") is True
     )
@@ -226,7 +223,9 @@ def add_sale():
         cur = conn.cursor(dictionary=True)
 
         # -------------------------------------------------------
-        # Lock inventory row
+        # Find and lock inventory row when it exists.
+        # A product does NOT need to exist in Inventory in order
+        # to be recorded as a sale.
         # -------------------------------------------------------
 
         cur.execute("""
@@ -245,26 +244,50 @@ def add_sale():
 
         inventory = cur.fetchone()
 
+        # -------------------------------------------------------
+        # PRODUCT NOT IN INVENTORY
+        # -------------------------------------------------------
+        # Record the sale normally. Since there is no inventory
+        # row, there is no stock to reduce.
+        # -------------------------------------------------------
+
         if not inventory:
-            conn.rollback()
+
+            cur.execute("""
+                INSERT INTO sales (
+                    sale_date,
+                    product_name,
+                    quantity,
+                    amount,
+                    split_amount,
+                    total_amount,
+                    sale_type
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, 'Product')
+            """, (
+                sale_date,
+                product_name,
+                quantity,
+                amount,
+                split_amount,
+                total_amount
+            ))
+
+            sale_id = cur.lastrowid
+            conn.commit()
 
             return jsonify({
-                "error":
-                    f"Product '{product_name}' is not available in inventory"
-            }), 400
+                "message": "Sale added successfully. Product was not in inventory, so stock was not changed.",
+                "id": sale_id,
+                "inventory_updated": False
+            }), 201
 
         current_stock = int(
             inventory["quantity"] or 0
         )
 
         # -------------------------------------------------------
-        # STOCK CHECK
-        #
-        # Normal:
-        #   Stock 5, Sale 10 -> BLOCK
-        #
-        # Negative stock enabled:
-        #   Stock 5, Sale 10 -> ALLOW -> Stock -5
+        # STOCK CHECK FOR PRODUCTS THAT EXIST IN INVENTORY
         # -------------------------------------------------------
 
         if (
@@ -307,10 +330,8 @@ def add_sale():
         ))
 
         # -------------------------------------------------------
-        # Reduce stock
-        #
-        # This intentionally permits a negative result when
-        # allow_negative_stock=True.
+        # Reduce stock only when an inventory row exists.
+        # Negative result is allowed only when explicitly enabled.
         # -------------------------------------------------------
 
         cur.execute("""
@@ -322,11 +343,13 @@ def add_sale():
             inventory["id"]
         ))
 
+        sale_id = cur.lastrowid
         conn.commit()
 
         return jsonify({
             "message": "Sale added successfully",
-            "id": cur.lastrowid
+            "id": sale_id,
+            "inventory_updated": True
         }), 201
 
     except Exception as e:
@@ -369,8 +392,7 @@ def update_sale(sale_id):
 
     total_amount = amount + split_amount
 
-    # Same rule as ADD SALE:
-    # only a real JSON true can allow negative stock.
+    # Only a real JSON true can allow negative stock.
     allow_negative_stock = (
         data.get("allow_negative_stock") is True
     )
@@ -443,7 +465,9 @@ def update_sale(sale_id):
             }), 400
 
         # -------------------------------------------------------
-        # Lock old inventory
+        # Lock OLD inventory when it exists.
+        # If the old product is not in inventory, continue without
+        # restoring stock because there is no stock row to restore.
         # -------------------------------------------------------
 
         cur.execute("""
@@ -462,126 +486,83 @@ def update_sale(sale_id):
 
         old_inventory = cur.fetchone()
 
-        if not old_inventory:
+        if old_inventory:
 
-            conn.rollback()
-
-            return jsonify({
-                "error": (
-                    f"Old product '{old_product_name}' "
-                    "was not found in inventory"
-                )
-            }), 400
+            # Return old sale quantity to stock before recalculating
+            # the new sale.
+            cur.execute("""
+                UPDATE inventory
+                SET quantity = quantity + %s
+                WHERE id = %s
+            """, (
+                old_quantity,
+                old_inventory["id"]
+            ))
 
         # -------------------------------------------------------
-        # Return OLD sale quantity back to stock
-        #
-        # Example:
-        #   Current stock = -5
-        #   Old sale = 10
-        #   Restored stock = 5
+        # Lock NEW inventory row when it exists.
         # -------------------------------------------------------
 
         cur.execute("""
-            UPDATE inventory
-            SET quantity = quantity + %s
-            WHERE id = %s
+            SELECT
+                id,
+                product_name,
+                quantity
+            FROM inventory
+            WHERE product_name = %s
+            ORDER BY id
+            LIMIT 1
+            FOR UPDATE
         """, (
-            old_quantity,
-            old_inventory["id"]
+            new_product_name,
         ))
 
+        new_inventory = cur.fetchone()
+
         # -------------------------------------------------------
-        # If product is changed, lock the NEW inventory row
+        # NEW PRODUCT NOT IN INVENTORY
+        # -------------------------------------------------------
+        # The sale can still be updated. No stock movement is made.
         # -------------------------------------------------------
 
-        if old_product_name != new_product_name:
+        if new_inventory:
 
-            cur.execute("""
-                SELECT
-                    id,
-                    product_name,
-                    quantity
-                FROM inventory
-                WHERE product_name = %s
-                ORDER BY id
-                LIMIT 1
-                FOR UPDATE
-            """, (
-                new_product_name,
-            ))
+            current_stock = int(
+                new_inventory["quantity"] or 0
+            )
 
-            new_inventory = cur.fetchone()
+            # ---------------------------------------------------
+            # Check stock only for an existing inventory product.
+            # ---------------------------------------------------
 
-            if not new_inventory:
+            if (
+                current_stock < new_quantity
+                and not allow_negative_stock
+            ):
 
                 conn.rollback()
 
                 return jsonify({
                     "error": (
-                        f"New product '{new_product_name}' "
-                        "was not found in inventory"
+                        f"Insufficient stock for '{new_product_name}'. "
+                        f"Available: {current_stock}, "
+                        f"Required: {new_quantity}. "
+                        f"Enable 'Allow Negative Stock' to continue."
                     )
                 }), 400
 
-        else:
-
-            new_inventory = old_inventory
-
-            # Re-read the quantity after restoring the old sale.
-            # This keeps the stock check accurate for same-product
-            # edits.
-            current_quantity = int(
-                old_inventory["quantity"] or 0
-            )
-
-            restored_quantity = (
-                current_quantity + old_quantity
-            )
-
-            new_inventory["quantity"] = (
-                restored_quantity
-            )
+            # Deduct the new quantity.
+            cur.execute("""
+                UPDATE inventory
+                SET quantity = quantity - %s
+                WHERE id = %s
+            """, (
+                new_quantity,
+                new_inventory["id"]
+            ))
 
         # -------------------------------------------------------
-        # Check NEW stock
-        # -------------------------------------------------------
-
-        current_stock = int(
-            new_inventory["quantity"] or 0
-        )
-
-        if (
-            current_stock < new_quantity
-            and not allow_negative_stock
-        ):
-
-            conn.rollback()
-
-            return jsonify({
-                "error": (
-                    f"Insufficient stock for '{new_product_name}'. "
-                    f"Available: {current_stock}, "
-                    f"Required: {new_quantity}. "
-                    f"Enable 'Allow Negative Stock' to continue."
-                )
-            }), 400
-
-        # -------------------------------------------------------
-        # Deduct NEW sale quantity
-        # -------------------------------------------------------
-
-        cur.execute("""
-            UPDATE inventory
-            SET quantity = quantity - %s
-            WHERE id = %s
-        """, (
-            new_quantity,
-            new_inventory["id"]
-        ))
-
-        # -------------------------------------------------------
-        # Update sale
+        # Update sale record
         # -------------------------------------------------------
 
         cur.execute("""
@@ -607,7 +588,8 @@ def update_sale(sale_id):
         conn.commit()
 
         return jsonify({
-            "message": "Sale updated successfully"
+            "message": "Sale updated successfully",
+            "inventory_updated": bool(new_inventory)
         })
 
     except Exception as e:
@@ -643,7 +625,7 @@ def delete_sale(sale_id):
         cur = conn.cursor(dictionary=True)
 
         # -------------------------------------------------------
-        # Get sale
+        # Get sale and lock it
         # -------------------------------------------------------
 
         cur.execute("""
@@ -682,7 +664,10 @@ def delete_sale(sale_id):
         quantity = int(sale["quantity"] or 0)
 
         # -------------------------------------------------------
-        # Find inventory
+        # Find inventory.
+        # -------------------------------------------------------
+        # If the product is not in inventory, simply delete the sale
+        # without attempting to restore stock.
         # -------------------------------------------------------
 
         cur.execute("""
@@ -698,32 +683,20 @@ def delete_sale(sale_id):
 
         inventory = cur.fetchone()
 
-        if not inventory:
+        if inventory:
 
-            conn.rollback()
-
-            return jsonify({
-                "error": (
-                    f"Product '{product_name}' "
-                    "was not found in inventory"
-                )
-            }), 400
-
-        # -------------------------------------------------------
-        # Return sold quantity to stock
-        # -------------------------------------------------------
-
-        cur.execute("""
-            UPDATE inventory
-            SET quantity = quantity + %s
-            WHERE id = %s
-        """, (
-            quantity,
-            inventory["id"]
-        ))
+            # Return sold quantity to stock.
+            cur.execute("""
+                UPDATE inventory
+                SET quantity = quantity + %s
+                WHERE id = %s
+            """, (
+                quantity,
+                inventory["id"]
+            ))
 
         # -------------------------------------------------------
-        # Delete sale
+        # Delete sale in both cases.
         # -------------------------------------------------------
 
         cur.execute("""
@@ -734,7 +707,12 @@ def delete_sale(sale_id):
         conn.commit()
 
         return jsonify({
-            "message": "Sale deleted and stock restored successfully"
+            "message": (
+                "Sale deleted and stock restored successfully"
+                if inventory
+                else "Sale deleted successfully. Product was not in inventory, so stock was not changed."
+            ),
+            "inventory_updated": bool(inventory)
         })
 
     except Exception as e:
@@ -753,6 +731,8 @@ def delete_sale(sale_id):
 
         if conn:
             conn.close()
+
+
 # ===============================================================
 # EXPENSES
 # ===============================================================
