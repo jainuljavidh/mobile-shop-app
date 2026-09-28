@@ -1749,3 +1749,64 @@ th.amount-cell {
   }
 
 }
+
+.header-actions {
+    margin-left: auto !important;
+    display: flex;
+    
+    justify-content: flex-end;
+}
+
+.signout-button {
+    background: #dc2626;
+    color: #ffffff;
+    border: none;
+    border-radius: 30px;
+    padding: 14px 20px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s ease;
+    margin-left: 70px !important;
+}
+
+.signout-button:hover {
+    background: #b91c1c;
+}
+
+.signout-button:active {
+    transform: scale(0.98);
+}
+
+/* =========================================================
+   REPAIR TRACKER - KEEP ACTION VISIBLE
+========================================================= */
+
+.repair-table-scroll {
+    position: relative;
+    overflow-x: auto;
+}
+
+/* Keep Action column visible on the right */
+.repair-table-scroll th:last-child,
+.repair-table-scroll td:last-child {
+    position: sticky;
+    right: 0;
+    z-index: 10;
+    background: var(--card);
+    min-width: 90px;
+    width: 90px;
+}
+
+/* Header Action column */
+.repair-table-scroll thead th:last-child {
+    z-index: 20;
+    background: var(--card);
+}
+
+/* Make Delete button clearly visible */
+.repair-table-scroll td:last-child .row-delete {
+    display: inline-block;
+    white-space: nowrap;
+    cursor: pointer;
+}

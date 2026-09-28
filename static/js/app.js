@@ -4243,11 +4243,12 @@ function renderRepairsTable() {
 
 
                     // ----------------------------------------
+                    // ----------------------------------------
                     // DELIVERY CONFIRMATION
                     // ----------------------------------------
 
                     let finalRepairAmount = null;
-
+                    let actualDeliveryDate = null;
 
                     if (
                         newStatus ===
@@ -4260,59 +4261,127 @@ function renderRepairsTable() {
                         const currentAdvance =
                             Number(r.advance) || 0;
 
-                        const confirmDelivery =
-                            confirm(
-                                'Mark this repair as Delivered to Customer?\n\n' +
-                                'If a part was requested, stock will be reduced.\n' +
-                                'The final amount paid by the customer will be recorded in Sales and Dashboard.'
+                        // ------------------------------------
+                        // ASK ACTUAL PHYSICAL DELIVERY DATE
+                        // ------------------------------------
+
+                        const browserToday =
+                            todayStr();
+
+                        const enteredDeliveryDate =
+                            window.prompt(
+                                'Enter the ACTUAL date the customer received the phone.\n\n' +
+                                'Enter date as DD-MM-YYYY (example: 27-09-2026).\n\n' +
+                                'Today is: ' + browserToday,
+                                r.delivery_date
+                                    ? r.delivery_date.split('-').reverse().join('-')
+                                    : browserToday.split('-').reverse().join('-')
                             );
 
+                        if (enteredDeliveryDate === null) {
+
+                            await loadRepairs();
+
+                            return;
+                        }
+
+                        const enteredDate = String(enteredDeliveryDate).trim();
+
+                        // Accept the shop's normal DD-MM-YYYY format.
+                        // Also accept YYYY-MM-DD for compatibility.
+                        if (/^\d{2}-\d{2}-\d{4}$/.test(enteredDate)) {
+                            const [dd, mm, yyyy] = enteredDate.split('-');
+                            actualDeliveryDate = `${yyyy}-${mm}-${dd}`;
+                        } else if (/^\d{4}-\d{2}-\d{2}$/.test(enteredDate)) {
+                            actualDeliveryDate = enteredDate;
+                        } else {
+                            toast(
+                                'Enter date in DD-MM-YYYY format.',
+                                true
+                            );
+
+                            await loadRepairs();
+
+                            return;
+                        }
+
+                        // Validate that the date is a real calendar date.
+                        const [yyyy, mm, dd] = actualDeliveryDate.split('-').map(Number);
+                        const checkDate = new Date(yyyy, mm - 1, dd);
+
+                        if (
+                            checkDate.getFullYear() !== yyyy ||
+                            checkDate.getMonth() !== mm - 1 ||
+                            checkDate.getDate() !== dd
+                        ) {
+                            toast(
+                                'Enter a valid date.',
+                                true
+                            );
+
+                            await loadRepairs();
+
+                            return;
+                        }
+
+                        if (
+                            actualDeliveryDate > browserToday
+                        ) {
+
+                            toast(
+                                'Delivery date cannot be a future date.',
+                                true
+                            );
+
+                            await loadRepairs();
+
+                            return;
+                        }
+
+                        // ------------------------------------
+                        // CONFIRM DELIVERY
+                        // ------------------------------------
+
+                        const confirmDelivery =
+                            confirm(
+                                'Confirm delivery?\\n\\n' +
+                                'Actual delivery date: ' +
+                                actualDeliveryDate +
+                                '\\n\\n' +
+                                'The repair sale will be recorded on this date.\\n' +
+                                'If a part was requested, stock will be reduced.'
+                            );
 
                         if (!confirmDelivery) {
 
                             await loadRepairs();
 
-
                             return;
-
                         }
 
-
-                        // ------------------------------------------------
-                        // ASK FOR FINAL CUSTOMER AMOUNT
-                        // ------------------------------------------------
-                        // Example:
-                        // Quoted amount = 2000
-                        // Customer negotiates discount
-                        // Final payment = 1800
-                        //
-                        // Only 1800 will be recorded in Sales/Dashboard.
-                        // ------------------------------------------------
+                        // ------------------------------------
+                        // ASK FINAL CUSTOMER AMOUNT
+                        // ------------------------------------
 
                         const enteredAmount =
                             window.prompt(
-                                `Original repair amount: ${fmt(quotedAmount)}\n` +
-                                `Advance already received: ${fmt(currentAdvance)}\n\n` +
+                                `Original repair amount: ${fmt(quotedAmount)}\\n` +
+                                `Advance already received: ${fmt(currentAdvance)}\\n\\n` +
                                 'Enter the FINAL amount agreed with the customer:',
                                 quotedAmount.toFixed(2)
                             );
-
 
                         if (enteredAmount === null) {
 
                             await loadRepairs();
 
-
                             return;
-
                         }
-
 
                         finalRepairAmount =
                             Number(
                                 String(enteredAmount).trim()
                             );
-
 
                         if (
                             !Number.isFinite(finalRepairAmount) ||
@@ -4327,11 +4396,11 @@ function renderRepairsTable() {
                             await loadRepairs();
 
                             return;
-
                         }
 
-
-                        if (finalRepairAmount > quotedAmount) {
+                        if (
+                            finalRepairAmount > quotedAmount
+                        ) {
 
                             toast(
                                 `Final amount cannot be greater than ${fmt(quotedAmount)}.`,
@@ -4341,11 +4410,11 @@ function renderRepairsTable() {
                             await loadRepairs();
 
                             return;
-
                         }
 
-
-                        if (finalRepairAmount < currentAdvance) {
+                        if (
+                            finalRepairAmount < currentAdvance
+                        ) {
 
                             toast(
                                 `Final amount cannot be less than the advance already received of ${fmt(currentAdvance)}.`,
@@ -4355,11 +4424,8 @@ function renderRepairsTable() {
                             await loadRepairs();
 
                             return;
-
                         }
-
                     }
-
 
                     try {
 
@@ -4380,7 +4446,9 @@ function renderRepairsTable() {
                                                 'Delivered to Customer'
                                                 ? {
                                                     final_amount:
-                                                        finalRepairAmount
+                                                        finalRepairAmount,
+                                                    delivery_date:
+                                                        actualDeliveryDate
                                                 }
                                                 : {})
 

@@ -3,7 +3,20 @@
 import os
 from datetime import date, datetime, timedelta, timezone
 
-from flask import Flask, jsonify, request, render_template
+from flask import (
+    Flask,
+    jsonify,
+    request,
+    render_template,
+    redirect,
+    url_for,
+    session
+)
+
+from werkzeug.security import (
+    generate_password_hash,
+    check_password_hash
+)
 import mysql.connector
 from mysql.connector import pooling
 from dotenv import load_dotenv
@@ -11,6 +24,16 @@ from dotenv import load_dotenv
 load_dotenv()
 
 app = Flask(__name__)
+
+app.secret_key = os.environ.get(
+    "FLASK_SECRET_KEY",
+    "change-this-secret-key"
+)
+
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax"
+)
 
 IST = timezone(timedelta(hours=5, minutes=30))
 
@@ -48,6 +71,337 @@ def to_float(value):
 
     return float(value)
 
+# ===============================================================
+# AUTHENTICATION
+# ===============================================================
+
+
+@app.route("/signin", methods=["GET", "POST"])
+def signin():
+
+    if request.method == "GET":
+
+        if session.get("logged_in"):
+            return redirect(url_for("index"))
+
+        return render_template("signin.html")
+
+
+    username = (
+        request.form.get("username")
+        or ""
+    ).strip()
+
+    password = (
+        request.form.get("password")
+        or ""
+    )
+
+
+    if not username or not password:
+
+        return render_template(
+            "signin.html",
+            error="Username and password are required."
+        )
+
+
+    conn = None
+    cur = None
+
+    try:
+
+        conn = get_conn()
+
+        cur = conn.cursor(
+            dictionary=True
+        )
+
+        cur.execute(
+            """
+            SELECT
+                id,
+                username,
+                password_hash
+            FROM users
+            WHERE username = %s
+            LIMIT 1
+            """,
+            (username,)
+        )
+
+        user = cur.fetchone()
+
+
+        if not user:
+
+            return render_template(
+                "signin.html",
+                error="Invalid username or password."
+            )
+
+
+        if not check_password_hash(
+            user["password_hash"],
+            password
+        ):
+
+            return render_template(
+                "signin.html",
+                error="Invalid username or password."
+            )
+
+
+        session.clear()
+
+        session["logged_in"] = True
+        session["user_id"] = user["id"]
+        session["username"] = user["username"]
+
+
+        return redirect(
+            url_for("index")
+        )
+
+
+    except Exception as e:
+
+        print(
+            "SIGNIN ERROR:",
+            e
+        )
+
+        return render_template(
+            "signin.html",
+            error="Unable to sign in right now."
+        ), 500
+
+
+    finally:
+
+        if cur:
+            cur.close()
+
+        if conn:
+            conn.close()
+
+
+# ===============================================================
+# SIGN UP
+# ===============================================================
+
+
+@app.route("/signup", methods=["GET", "POST"])
+def signup():
+
+    if request.method == "GET":
+
+        if session.get("logged_in"):
+            return redirect(url_for("index"))
+
+        return render_template("signup.html")
+
+
+    username = (
+        request.form.get("username")
+        or ""
+    ).strip()
+
+    password = (
+        request.form.get("password")
+        or ""
+    )
+
+    confirm_password = (
+        request.form.get("confirm_password")
+        or ""
+    )
+
+
+    if not username:
+
+        return render_template(
+            "signup.html",
+            error="Username is required."
+        )
+
+
+    if len(username) < 3:
+
+        return render_template(
+            "signup.html",
+            error="Username must contain at least 3 characters."
+        )
+
+
+    if len(password) < 6:
+
+        return render_template(
+            "signup.html",
+            error="Password must contain at least 6 characters."
+        )
+
+
+    if password != confirm_password:
+
+        return render_template(
+            "signup.html",
+            error="Passwords do not match."
+        )
+
+
+    conn = None
+    cur = None
+
+    try:
+
+        conn = get_conn()
+
+        cur = conn.cursor(
+            dictionary=True
+        )
+
+
+        cur.execute(
+            """
+            SELECT id
+            FROM users
+            WHERE username = %s
+            LIMIT 1
+            """,
+            (username,)
+        )
+
+        existing_user = cur.fetchone()
+
+
+        if existing_user:
+
+            return render_template(
+                "signup.html",
+                error="Username already exists."
+            )
+
+
+        password_hash = generate_password_hash(
+            password
+        )
+
+
+        cur.execute(
+            """
+            INSERT INTO users
+            (
+                username,
+                password_hash
+            )
+            VALUES
+            (
+                %s,
+                %s
+            )
+            """,
+            (
+                username,
+                password_hash
+            )
+        )
+
+
+        conn.commit()
+
+
+        return redirect(
+            url_for(
+                "signin",
+                registered="1"
+            )
+        )
+
+
+    except Exception as e:
+
+        if conn:
+            conn.rollback()
+
+        print(
+            "SIGNUP ERROR:",
+            e
+        )
+
+        return render_template(
+            "signup.html",
+            error="Unable to create account."
+        ), 500
+
+
+    finally:
+
+        if cur:
+            cur.close()
+
+        if conn:
+            conn.close()
+
+
+# ===============================================================
+# SIGN OUT
+# ===============================================================
+
+
+@app.route(
+    "/signout",
+    methods=["POST"]
+)
+def signout():
+
+    session.clear()
+
+    return redirect(
+        url_for("signin")
+    )
+
+
+# ===============================================================
+# AUTHENTICATION PROTECTION
+# ===============================================================
+
+
+@app.before_request
+def require_login():
+
+    public_paths = (
+        "/signin",
+        "/signup",
+        "/static/"
+    )
+
+
+    if (
+        request.path == "/signin"
+        or request.path == "/signup"
+        or request.path.startswith("/static/")
+    ):
+
+        return None
+
+
+    if session.get("logged_in"):
+
+        return None
+
+
+    if request.path.startswith("/api/"):
+
+        return jsonify({
+            "error": "Authentication required"
+        }), 401
+
+
+    return redirect(
+        url_for("signin")
+    )
+
 
 # ===============================================================
 # PAGE
@@ -55,7 +409,16 @@ def to_float(value):
 
 @app.route("/")
 def index():
-    return render_template("index.html")
+
+    if not session.get("logged_in"):
+
+        return redirect(
+            url_for("signin")
+        )
+
+    return render_template(
+        "index.html"
+    )
 
 
 # ===============================================================
@@ -1628,6 +1991,7 @@ def get_repairs():
                 SELECT
                     id,
                     repair_date,
+                    delivery_date,
                     customer_name,
                     customer_number,
                     product_name,
@@ -1660,12 +2024,22 @@ def get_repairs():
                     OR
 
                     -- A delivered repair is visible on its
-                    -- actual delivery date only.
-                    DATE(delivered_at) = %s
+                    -- actual physical delivery date only.
+                    delivery_date = %s
+
+                    OR
+
+                    -- An item returned repair is visible on the
+                    -- date it was actually returned/closed.
+                    (
+                        status = 'Item Returned'
+                        AND DATE(delivered_at) = %s
+                    )
                 )
                 ORDER BY id DESC
                 """,
                 (
+                    d,
                     d,
                     d,
                     d
@@ -1679,6 +2053,7 @@ def get_repairs():
                 SELECT
                     id,
                     repair_date,
+                    delivery_date,
                     customer_name,
                     customer_number,
                     product_name,
@@ -1711,6 +2086,7 @@ def get_repairs():
                 SELECT
                     id,
                     repair_date,
+                    delivery_date,
                     customer_name,
                     customer_number,
                     product_name,
@@ -1737,6 +2113,9 @@ def get_repairs():
 
             if row.get("repair_date"):
                 row["repair_date"] = row["repair_date"].isoformat()
+
+            if row.get("delivery_date"):
+                row["delivery_date"] = row["delivery_date"].isoformat()
 
             if row.get("received_at"):
                 row["received_at"] = row["received_at"].isoformat()
@@ -1895,6 +2274,7 @@ def add_repair():
             INSERT INTO repairs
             (
                 repair_date,
+                delivery_date,
                 customer_name,
                 customer_number,
                 product_name,
@@ -1912,6 +2292,7 @@ def add_repair():
             VALUES
             (
                 %s,
+                NULL,
                 %s,
                 %s,
                 %s,
@@ -2202,11 +2583,50 @@ def update_repair_status(repair_id):
         or ""
     ).strip()
 
+    delivery_date = data.get("delivery_date")
+
     if new_status not in REPAIR_STATUSES:
 
         return jsonify({
             "error": "Invalid repair status"
         }), 400
+
+    # -------------------------------------------------------
+    # ACTUAL DELIVERY DATE
+    # -------------------------------------------------------
+    # This is the date the customer physically received the phone.
+    # It is intentionally separate from delivered_at, which stores
+    # when the application was updated.
+    # -------------------------------------------------------
+
+    if new_status == "Delivered to Customer":
+
+        if not delivery_date:
+
+            return jsonify({
+                "error": "Actual delivery date is required"
+            }), 400
+
+        try:
+
+            delivery_date_obj = datetime.strptime(
+                str(delivery_date),
+                "%Y-%m-%d"
+            ).date()
+
+        except (ValueError, TypeError):
+
+            return jsonify({
+                "error": "Invalid delivery date. Use YYYY-MM-DD."
+            }), 400
+
+        if delivery_date_obj > date.today():
+
+            return jsonify({
+                "error": "Delivery date cannot be a future date"
+            }), 400
+
+        delivery_date = delivery_date_obj.isoformat()
 
     conn = None
     cur = None
@@ -2234,7 +2654,8 @@ def update_repair_status(repair_id):
                 advance,
                 status,
                 stock_reduced,
-                sales_recorded
+                sales_recorded,
+                delivery_date
             FROM repairs
             WHERE id = %s
             FOR UPDATE
@@ -2285,16 +2706,6 @@ def update_repair_status(repair_id):
         # -------------------------------------------------------
         # ITEM RETURNED PROCESS
         # -------------------------------------------------------
-        # Phone is dead / not recoverable, so the item is returned
-        # to the customer without completing the repair.
-        #
-        # Important:
-        # - Do NOT reduce part stock.
-        # - Do NOT create a sales record.
-        # - Close the repair by storing the return time in delivered_at.
-        #   This existing field is used as the close/return timestamp so
-        #   the repair does not remain in the pending list.
-        # -------------------------------------------------------
 
         if new_status == "Item Returned":
 
@@ -2302,8 +2713,6 @@ def update_repair_status(repair_id):
                 """
                 UPDATE repairs
                 SET
-                    amount = %s,
-                    advance = %s,
                     status = %s,
                     delivered_at = COALESCE(
                         delivered_at,
@@ -2312,8 +2721,6 @@ def update_repair_status(repair_id):
                 WHERE id = %s
                 """,
                 (
-                    final_amount,
-                    total_received,
                     new_status,
                     datetime.now(IST).replace(tzinfo=None),
                     repair_id
@@ -2323,11 +2730,23 @@ def update_repair_status(repair_id):
             conn.commit()
 
             return jsonify({
-                "message": "Item returned successfully. No sale or stock change was made.",
+                "message": (
+                    "Item returned successfully. "
+                    "No sale or stock change was made."
+                ),
                 "repair_id": repair_id,
                 "status": new_status,
-                "stock_reduced": int(repair["stock_reduced"] or 0),
-                "sales_recorded": int(repair["sales_recorded"] or 0)
+                "stock_reduced": int(
+                    repair["stock_reduced"] or 0
+                ),
+                "sales_recorded": int(
+                    repair["sales_recorded"] or 0
+                ),
+                "balance": max(
+                    0,
+                    to_float(repair["amount"])
+                    - to_float(repair["advance"])
+                )
             })
 
         # -------------------------------------------------------
@@ -2335,17 +2754,6 @@ def update_repair_status(repair_id):
         # -------------------------------------------------------
 
         if new_status == "Delivered to Customer":
-
-            # ---------------------------------------------------
-            # ORIGINAL / QUOTED REPAIR AMOUNT
-            # ---------------------------------------------------
-            # Example: repair amount = 2000
-            # Customer negotiates a discount at delivery and
-            # finally pays 1800.
-            #
-            # The frontend sends final_amount = 1800.
-            # Sales/dashboard must record 1800, not 2000.
-            # ---------------------------------------------------
 
             quoted_amount = to_float(
                 repair["amount"]
@@ -2358,20 +2766,25 @@ def update_repair_status(repair_id):
             raw_final_amount = data.get("final_amount")
 
             try:
-                final_amount = to_float(raw_final_amount)
+
+                final_amount = to_float(
+                    raw_final_amount
+                )
+
             except (ValueError, TypeError):
+
                 return jsonify({
                     "error": "Enter a valid final repair amount"
                 }), 400
 
-            # Final amount must be non-negative and cannot be
-            # greater than the originally quoted repair amount.
             if final_amount < 0:
+
                 return jsonify({
                     "error": "Final repair amount cannot be negative"
                 }), 400
 
             if final_amount > quoted_amount:
+
                 return jsonify({
                     "error": (
                         f"Final repair amount cannot be greater than "
@@ -2379,9 +2792,8 @@ def update_repair_status(repair_id):
                     )
                 }), 400
 
-            # If an advance was already collected, the discounted
-            # final amount cannot be below the amount already paid.
             if final_amount < advance:
+
                 return jsonify({
                     "error": (
                         f"Final repair amount cannot be less than the "
@@ -2389,9 +2801,6 @@ def update_repair_status(repair_id):
                     )
                 }), 400
 
-            # Customer is completing the payment at delivery.
-            # The final amount becomes the actual amount received
-            # for this repair.
             remaining = 0
             total_received = final_amount
 
@@ -2401,8 +2810,7 @@ def update_repair_status(repair_id):
 
             if (
                 repair["part_request"]
-                and
-                int(repair["stock_reduced"] or 0) == 0
+                and int(repair["stock_reduced"] or 0) == 0
             ):
 
                 part_name = (
@@ -2460,9 +2868,7 @@ def update_repair_status(repair_id):
                     SET quantity = quantity - 1
                     WHERE id = %s
                     """,
-                    (
-                        inventory["id"],
-                    )
+                    (inventory["id"],)
                 )
 
                 cur.execute(
@@ -2471,9 +2877,7 @@ def update_repair_status(repair_id):
                     SET stock_reduced = 1
                     WHERE id = %s
                     """,
-                    (
-                        repair_id,
-                    )
+                    (repair_id,)
                 )
 
             # ===================================================
@@ -2481,28 +2885,6 @@ def update_repair_status(repair_id):
             # ===================================================
 
             if int(repair["sales_recorded"] or 0) == 0:
-
-                # ------------------------------------------------
-                # IMPORTANT REPAIR SALES LOGIC
-                #
-                # The repair becomes a sale only when the customer
-                # collects the phone (Delivered to Customer).
-                # The ORIGINAL repair date is not used for sales.
-                #
-                # Sales/dashboard must record the FINAL amount the
-                # customer actually pays on the DELIVERY DATE.
-                #
-                # Example:
-                #   Quoted repair amount = 2000
-                #   Customer discount   = 200
-                #   Final amount paid    = 1800
-                #
-                #   Delivery-day Sales = 1800
-                #
-                # The quoted amount is replaced by the final amount
-                # for the completed transaction so the repair balance
-                # also becomes zero.
-                # ------------------------------------------------
 
                 received_amount = final_amount
 
@@ -2532,7 +2914,7 @@ def update_repair_status(repair_id):
                     )
                     """,
                     (
-                        date.today().isoformat(),
+                        delivery_date,
                         repair["product_name"],
                         received_amount,
                         received_amount,
@@ -2546,13 +2928,11 @@ def update_repair_status(repair_id):
                     SET sales_recorded = 1
                     WHERE id = %s
                     """,
-                    (
-                        repair_id,
-                    )
+                    (repair_id,)
                 )
 
             # ===================================================
-            # 3. UPDATE REPAIR STATUS
+            # 3. UPDATE REPAIR STATUS + ACTUAL DELIVERY DATE
             # ===================================================
 
             cur.execute(
@@ -2560,6 +2940,7 @@ def update_repair_status(repair_id):
                 UPDATE repairs
                 SET
                     status = %s,
+                    delivery_date = %s,
                     delivered_at = COALESCE(
                         delivered_at,
                         %s
@@ -2568,6 +2949,7 @@ def update_repair_status(repair_id):
                 """,
                 (
                     new_status,
+                    delivery_date,
                     datetime.now(IST).replace(tzinfo=None),
                     repair_id
                 )
@@ -2579,11 +2961,15 @@ def update_repair_status(repair_id):
                 "message": "Repair delivered successfully",
                 "repair_id": repair_id,
                 "quoted_amount": quoted_amount,
-                "discount": round(quoted_amount - final_amount, 2),
+                "discount": round(
+                    quoted_amount - final_amount,
+                    2
+                ),
                 "amount": final_amount,
                 "advance": total_received,
                 "received_amount": final_amount,
                 "balance": remaining,
+                "delivery_date": delivery_date,
                 "stock_reduced": True,
                 "sales_recorded": True
             })
@@ -2617,10 +3003,7 @@ def update_repair_status(repair_id):
         if conn:
             conn.rollback()
 
-        print(
-            "REPAIR STATUS ERROR:",
-            e
-        )
+        print("REPAIR STATUS ERROR:", e)
 
         return jsonify({
             "error": str(e)
@@ -2634,10 +3017,6 @@ def update_repair_status(repair_id):
         if conn:
             conn.close()
 
-
-# ===============================================================
-# ADD REPAIR BALANCE PAYMENT
-# ===============================================================
 
 @app.route(
     "/api/repairs/<int:repair_id>/balance-payment",

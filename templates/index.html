@@ -298,10 +298,20 @@
                     </button>
 
                 </div>
+                
 
             </div>
+            <form method="POST" action="{{ url_for('signout') }}">
+        <button type="submit" class="signout-button">
+            Sign Out
+        </button>
+    </form>
 
         </div>
+        
+        <div class="header-actions">
+    
+</div>
 
     </header>
 
@@ -1742,7 +1752,7 @@
             type="text"
             name="customer_name"
             placeholder="Customer name"
-            required
+            
         >
 
 
