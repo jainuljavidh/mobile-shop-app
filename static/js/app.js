@@ -595,11 +595,32 @@ async function loadSales() {
                 tr.querySelector('.sales-actions');
 
             // -------------------------------------------------
-            // REPAIR SALE
+            // PAYMENT-LINKED SALE
             // -------------------------------------------------
-            // Show Edit Balance only while money is still due.
+            // This row represents money collected later for a
+            // credit/partial payment. It must not be deleted or
+            // edited here; use Payment Tracking instead.
 
-            if (
+            if (r.payment_id) {
+
+                const paymentButton =
+                    document.createElement('button');
+
+                paymentButton.type = 'button';
+                paymentButton.className = 'row-edit';
+                paymentButton.textContent = 'Payment Received';
+                paymentButton.disabled = true;
+
+                if (actionCell) {
+                    actionCell.appendChild(paymentButton);
+                }
+
+            } else if (
+                // -------------------------------------------------
+                // REPAIR SALE
+                // -------------------------------------------------
+                // Show Edit Balance only while money is still due.
+
                 saleType === 'Repair' &&
                 repairId
             ) {
@@ -982,220 +1003,178 @@ if (salesForm) {
                     ? f.elements['part_item_selector'].value.trim()
                     : '';
 
-            const productInput =
-                f.elements['product_name'];
-
+            const productInput = f.elements['product_name'];
             const productName =
-                productInput.value.trim() ||
-                selectedPartItem;
+                productInput.value.trim() || selectedPartItem;
 
-            const quantity =
-                Number(
-                    f.elements['quantity'].value
-                );
+            const customerName =
+                f.elements['customer_name']
+                    ? f.elements['customer_name'].value.trim()
+                    : '';
 
-            const amount =
-                Number(
-                    f.elements['amount'].value
-                );
+            const quantity = Number(f.elements['quantity'].value);
+            const amount = Number(f.elements['amount'].value);
+            const paymentType =
+                f.elements['payment_type']
+                    ? f.elements['payment_type'].value
+                    : 'Full Payment';
 
-            // IMPORTANT:
-            // Negative stock is allowed ONLY when the
-            // checkbox is actually checked.
+            const paidAmount =
+                f.elements['paid_amount']
+                    ? (Number(f.elements['paid_amount'].value) || 0)
+                    : amount;
+
             const negativeStockInput =
                 f.elements['allow_negative_stock'];
 
-            const allowNegativeStock =
-                negativeStockInput
-                    ? negativeStockInput.checked === true
-                    : false;
-
-            console.log(
-                'Allow Negative Stock:',
-                allowNegativeStock
-            );
+            const allowNegativeStock = negativeStockInput
+                ? negativeStockInput.checked === true
+                : false;
 
             if (!productName) {
-
-                toast(
-                    'Please enter product name',
-                    true
-                );
-
+                toast('Please enter product name', true);
                 return;
-
             }
 
-            if (
-                !Number.isInteger(quantity) ||
-                quantity <= 0
-            ) {
-
-                toast(
-                    'Quantity must be greater than 0',
-                    true
-                );
-
+            if (!Number.isInteger(quantity) || quantity <= 0) {
+                toast('Quantity must be greater than 0', true);
                 return;
-
             }
 
-            if (
-                !Number.isFinite(amount) ||
-                amount < 0
-            ) {
-
-                toast(
-                    'Please enter a valid amount',
-                    true
-                );
-
+            if (!Number.isFinite(amount) || amount <= 0) {
+                toast('Please enter a valid total amount', true);
                 return;
-
             }
 
-            // ----------------------------------------------------
-            // FRONTEND SAFETY CHECK
-            //
-            // When the checkbox is OFF, do not allow the sale
-            // to continue if current inventory is insufficient.
-            // The backend must also enforce this rule.
-            // ----------------------------------------------------
+            if (paymentType !== 'Full Payment' && !customerName) {
+                toast('Customer name is required for credit or partial payment', true);
+                return;
+            }
+
+            if (paymentType === 'Partial Payment') {
+                if (!Number.isFinite(paidAmount) || paidAmount <= 0 || paidAmount >= amount) {
+                    toast('Partial paid amount must be less than the total amount', true);
+                    return;
+                }
+            }
+
+            if (paymentType === 'Credit' && paidAmount !== 0) {
+                toast('Credit payment must have paid amount ₹0', true);
+                return;
+            }
 
             if (!allowNegativeStock) {
-
-                const matchingItem =
-                    inventoryData.find(
-                        (item) =>
-                            String(
-                                item.product_name || ''
-                            )
-                                .trim()
-                                .toLowerCase() ===
-                            productName
-                                .trim()
-                                .toLowerCase()
-                    );
+                const matchingItem = inventoryData.find(
+                    (item) =>
+                        String(item.product_name || '').trim().toLowerCase() ===
+                        productName.trim().toLowerCase()
+                );
 
                 if (matchingItem) {
-
-                    const currentStock =
-                        Number(
-                            matchingItem.quantity
-                        ) || 0;
-
+                    const currentStock = Number(matchingItem.quantity) || 0;
                     if (currentStock < quantity) {
-
                         toast(
-                            `Insufficient stock for "${productName}". ` +
-                            `Available: ${currentStock}, ` +
-                            `Required: ${quantity}. ` +
-                            `Tick "Allow Negative Stock" to continue.`,
+                            `Insufficient stock for "${productName}". Available: ${currentStock}, Required: ${quantity}. Tick "Allow Negative Stock" to continue.`,
                             true
                         );
-
                         return;
-
                     }
-
                 }
-
             }
 
             const payload = {
-
-                sale_date:
-                    state.date,
-
-                product_name:
-                    productName,
-
-                quantity:
-                    quantity,
-
-                amount:
-                    amount,
-
-                // This will ALWAYS be a real Boolean.
-                allow_negative_stock:
-                    allowNegativeStock
-
+                sale_date: state.date,
+                customer_name: customerName,
+                product_name: productName,
+                quantity: quantity,
+                amount: amount,
+                payment_type: paymentType,
+                paid_amount: paymentType === 'Full Payment' ? amount : paidAmount,
+                payment_method: 'Cash',
+                allow_negative_stock: allowNegativeStock
             };
 
-            console.log(
-                'Sale payload:',
-                payload
-            );
-
             try {
-
-                await api(
+                const result = await api(
                     '/api/sales',
                     {
-
                         method: 'POST',
-
-                        body:
-                            JSON.stringify(payload)
-
+                        body: JSON.stringify(payload)
                     }
                 );
 
                 f.reset();
 
-                // Always return the checkbox to OFF
-                // after a successful sale.
-                if (
-                    f.elements[
-                        'allow_negative_stock'
-                    ]
-                ) {
-
-                    f.elements[
-                        'allow_negative_stock'
-                    ].checked = false;
-
+                if (f.elements['allow_negative_stock']) {
+                    f.elements['allow_negative_stock'].checked = false;
                 }
-
-                if (
-                    f.elements['quantity']
-                ) {
-
-                    f.elements['quantity'].value =
-                        1;
-
+                if (f.elements['quantity']) {
+                    f.elements['quantity'].value = 1;
                 }
+                if (f.elements['payment_type']) {
+                    f.elements['payment_type'].value = 'Full Payment';
+                }
+                if (f.elements['paid_amount']) {
+                    f.elements['paid_amount'].value = '';
+                }
+                refreshSalesPaymentFields();
 
                 populateSalesPartItemOptions();
 
-                toast(
-                    'Sale added successfully'
-                );
+                toast(result.message || 'Sale saved successfully');
 
                 await loadSales();
-
+                await loadPayments();
                 await loadInventory();
-
                 await loadSummary();
 
             } catch (err) {
-
-                console.error(
-                    'Add sale error:',
-                    err
-                );
-
-                toast(
-                    err.message,
-                    true
-                );
-
+                console.error('Add sale error:', err);
+                toast(err.message, true);
             }
-
         }
     );
 
 }
+
+
+// Sales payment-type helper.
+// Full Payment = entire amount goes to Sales.
+// Partial Payment = paid amount goes to Sales and remaining balance goes to Payment Tracking.
+// Credit = nothing goes to Sales today; full amount goes to Payment Tracking.
+const salesPaymentType = document.getElementById('salesPaymentType');
+const salesPaidAmount = document.getElementById('salesPaidAmount');
+const salesAmountInput = salesForm ? salesForm.elements['amount'] : null;
+
+function refreshSalesPaymentFields() {
+    if (!salesPaymentType || !salesPaidAmount) return;
+
+    const total = Number(salesAmountInput?.value) || 0;
+
+    if (salesPaymentType.value === 'Full Payment') {
+        salesPaidAmount.value = total > 0 ? total : '';
+        salesPaidAmount.disabled = true;
+        salesPaidAmount.placeholder = 'Paid amount (full)';
+    } else if (salesPaymentType.value === 'Credit') {
+        salesPaidAmount.value = '0';
+        salesPaidAmount.disabled = true;
+        salesPaidAmount.placeholder = 'Paid amount (₹0)';
+    } else {
+        salesPaidAmount.disabled = false;
+        salesPaidAmount.placeholder = 'Paid amount';
+        if (Number(salesPaidAmount.value) >= total && total > 0) {
+            salesPaidAmount.value = '';
+        }
+    }
+}
+
+if (salesPaymentType) {
+    salesPaymentType.addEventListener('change', refreshSalesPaymentFields);
+}
+if (salesAmountInput) {
+    salesAmountInput.addEventListener('input', refreshSalesPaymentFields);
+}
+refreshSalesPaymentFields();
 
 
 // ============================================================
@@ -5463,257 +5442,91 @@ async function editPayment(payment) {
 
     try {
 
-        const customerName =
-            prompt(
-                'Customer name:',
-                payment.customer_name || ''
-            );
+        const customerName = prompt(
+            'Customer name:',
+            payment.customer_name || ''
+        );
+        if (customerName === null) return;
 
+        const referenceName = prompt(
+            'Product / Reference:',
+            payment.reference_name || ''
+        );
+        if (referenceName === null) return;
 
-        if (customerName === null) {
+        const additionalInput = prompt(
+            `Additional payment received TODAY (pending: ${fmt(payment.balance_amount)}):`,
+            '0'
+        );
+        if (additionalInput === null) return;
 
-            return;
+        const additionalPayment = Number(additionalInput) || 0;
 
-        }
+        const paymentMethod = prompt(
+            'Payment method: Cash / UPI / Card / Bank Transfer',
+            payment.payment_method || 'Cash'
+        );
+        if (paymentMethod === null) return;
 
-
-        const referenceName =
-            prompt(
-                'Product / Reference:',
-                payment.reference_name || ''
-            );
-
-
-        if (referenceName === null) {
-
-            return;
-
-        }
-
-
-        const totalInput =
-            prompt(
-                'Total amount:',
-                payment.total_amount || 0
-            );
-
-
-        if (totalInput === null) {
-
-            return;
-
-        }
-
-
-        const totalAmount =
-            Number(totalInput);
-
-
-        const paidInput =
-            prompt(
-                'Paid amount:',
-                payment.paid_amount || 0
-            );
-
-
-        if (paidInput === null) {
-
-            return;
-
-        }
-
-
-        const paidAmount =
-            Number(paidInput);
-
-
-        const paymentMethod =
-            prompt(
-                'Payment method: Cash / UPI / Card / Bank Transfer',
-                payment.payment_method || 'Cash'
-            );
-
-
-        if (paymentMethod === null) {
-
-            return;
-
-        }
-
-
-        const cleanCustomerName =
-            customerName.trim();
-
-
-        const cleanReferenceName =
-            referenceName.trim();
-
-
-        const cleanPaymentMethod =
-            paymentMethod.trim();
-
+        const cleanCustomerName = customerName.trim();
+        const cleanReferenceName = referenceName.trim();
+        const cleanPaymentMethod = paymentMethod.trim();
 
         if (!cleanCustomerName) {
-
-            toast(
-                'Customer name is required',
-                true
-            );
-
+            toast('Customer name is required', true);
             return;
-
         }
-
-
         if (!cleanReferenceName) {
-
-            toast(
-                'Product / Reference is required',
-                true
-            );
-
+            toast('Product / Reference is required', true);
             return;
-
         }
-
-
-        if (
-            !Number.isFinite(totalAmount) ||
-            totalAmount <= 0
-        ) {
-
-            toast(
-                'Total amount must be greater than 0',
-                true
-            );
-
+        if (!Number.isFinite(additionalPayment) || additionalPayment < 0) {
+            toast('Additional payment cannot be negative', true);
             return;
-
         }
-
-
-        if (
-            !Number.isFinite(paidAmount) ||
-            paidAmount < 0
-        ) {
-
-            toast(
-                'Paid amount cannot be negative',
-                true
-            );
-
+        if (additionalPayment > (Number(payment.balance_amount) || 0)) {
+            toast('Additional payment cannot be greater than the pending balance', true);
             return;
-
         }
-
-
-        if (paidAmount > totalAmount) {
-
-            toast(
-                'Paid amount cannot be greater than total amount',
-                true
-            );
-
-            return;
-
-        }
-
 
         const validPaymentMethods = [
-
-            'Cash',
-
-            'UPI',
-
-            'Card',
-
-            'Bank Transfer'
-
+            'Cash', 'UPI', 'Card', 'Bank Transfer'
         ];
 
-
-        if (
-            !validPaymentMethods.includes(
-                cleanPaymentMethod
-            )
-        ) {
-
-            toast(
-                'Invalid payment method. Use Cash, UPI, Card or Bank Transfer.',
-                true
-            );
-
+        if (!validPaymentMethods.includes(cleanPaymentMethod)) {
+            toast('Invalid payment method. Use Cash, UPI, Card or Bank Transfer.', true);
             return;
-
         }
-
-
-        const payload = {
-
-            payment_date:
-                payment.payment_date ||
-                state.date,
-
-            customer_name:
-                cleanCustomerName,
-
-            reference_name:
-                cleanReferenceName,
-
-            total_amount:
-                totalAmount,
-
-            paid_amount:
-                paidAmount,
-
-            payment_method:
-                cleanPaymentMethod,
-
-            notes:
-                payment.notes || ''
-
-        };
-
 
         await api(
             `/api/payments/${payment.id}`,
             {
-
                 method: 'PUT',
-
-                body:
-                    JSON.stringify(payload)
-
+                body: JSON.stringify({
+                    payment_date: additionalPayment > 0 ? state.date : (payment.payment_date || state.date),
+                    customer_name: cleanCustomerName,
+                    reference_name: cleanReferenceName,
+                    additional_payment: additionalPayment,
+                    payment_method: cleanPaymentMethod,
+                    notes: payment.notes || ''
+                })
             }
         );
 
-
         toast(
-            'Payment updated successfully'
+            additionalPayment > 0
+                ? `${fmt(additionalPayment)} received and added to Sales`
+                : 'Payment details updated'
         );
-
 
         await loadPayments();
-
+        await loadSales();
         await loadSummary();
 
-
     } catch (err) {
-
-        console.error(
-            'Edit payment error:',
-            err
-        );
-
-
-        toast(
-            'Could not update payment: ' +
-            err.message,
-            true
-        );
-
+        console.error('Edit payment error:', err);
+        toast('Could not update payment: ' + err.message, true);
     }
-
 }
 
 

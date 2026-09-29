@@ -1,237 +1,355 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-
     <meta charset="UTF-8">
-
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
-
-    <title>Sign In - Shop Ledger</title>
-
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shop Ledger - Sign In</title>
     <style>
+        * { box-sizing: border-box; }
 
-        * {
-            box-sizing: border-box;
+        html, body {
+            margin: 0;
+            width: 100%;
+            min-height: 100%;
+            font-family: Inter, "Segoe UI", Arial, sans-serif;
         }
 
         body {
-            margin: 0;
+            min-height: 100vh;
+            background:
+                linear-gradient(90deg, rgba(4, 22, 55, .16), rgba(0, 80, 190, .10)),
+                url("{{ url_for('static', filename='images/shop_ledger_login_background.png') }}") center center / cover no-repeat fixed;
+            overflow-x: hidden;
+        }
+
+        .login-page {
             min-height: 100vh;
             display: flex;
+            justify-content: flex-end;
             align-items: center;
-            justify-content: center;
-            font-family: Arial, sans-serif;
-            background: #eef3f9;
+            padding: 20px 5.5vw 20px 20px;
+            position: relative;
         }
 
-        .auth-container {
-            width: 100%;
-            max-width: 420px;
-            padding: 20px;
+        .login-card {
+            width: min(420px, 92vw);
+            padding: 26px 30px 22px;
+            border-radius: 22px;
+            background: rgba(255, 255, 255, 0.93);
+            border: 1px solid rgba(255,255,255,.85);
+            box-shadow: 0 24px 70px rgba(0, 27, 75, .30);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+            position: relative;
+            z-index: 5;
         }
 
-        .auth-card {
-            background: white;
-            padding: 40px;
-            border-radius: 18px;
-            box-shadow:
-                0 12px 35px
-                rgba(0,0,0,0.12);
-        }
-
-        .logo {
-            width: 70px;
-            height: 70px;
-            margin: 0 auto 20px;
+        .brand {
             display: flex;
             align-items: center;
             justify-content: center;
-            border-radius: 18px;
-            background: #2563eb;
-            color: white;
-            font-size: 24px;
-            font-weight: bold;
+            gap: 10px;
+            margin-bottom: 5px;
         }
 
-        h1 {
+        .brand-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 15px;
+            display: grid;
+            place-items: center;
+            background: linear-gradient(145deg, #0788ff, #1254d8);
+            box-shadow: 0 10px 24px rgba(14, 102, 226, .25);
+            color: #fff;
+            font-size: 24px;
+        }
+
+        .brand-name {
+            font-size: 24px;
+            line-height: 1;
+            font-weight: 800;
+            letter-spacing: -1px;
+            color: #17233f;
+        }
+
+        .brand-name span { color: #087af1; }
+
+        .brand-subtitle {
+            text-align: center;
+            color: #6c7890;
+            font-size: 14px;
+            font-weight: 600;
+            margin: 5px 0 18px;
+        }
+
+        .heading {
             text-align: center;
             margin: 0;
+            color: #14203a;
+            font-size: 24px;
+            font-weight: 800;
         }
 
-        .subtitle {
+        .subheading {
             text-align: center;
-            color: #6b7280;
-            margin: 8px 0 28px;
+            color: #748097;
+            font-size: 14px;
+            margin: 6px 0 17px;
         }
 
-        .form-group {
-            margin-bottom: 18px;
-        }
-
-        label {
-            display: block;
-            margin-bottom: 7px;
+        .alert {
+            padding: 12px 14px;
+            margin-bottom: 16px;
+            border-radius: 12px;
+            background: #fff0f0;
+            border: 1px solid #ffcaca;
+            color: #bd2525;
+            font-size: 13px;
             font-weight: 600;
-        }
-
-        input {
-            width: 100%;
-            padding: 13px;
-            border: 1px solid #d1d5db;
-            border-radius: 10px;
-            font-size: 15px;
-        }
-
-        input:focus {
-            outline: none;
-            border-color: #2563eb;
-        }
-
-        button {
-            width: 100%;
-            padding: 13px;
-            border: 0;
-            border-radius: 10px;
-            background: #2563eb;
-            color: white;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-        }
-
-        .error {
-            background: #fee2e2;
-            color: #b91c1c;
-            padding: 11px;
-            border-radius: 8px;
-            margin-bottom: 18px;
-            text-align: center;
         }
 
         .success {
-            background: #dcfce7;
-            color: #166534;
-            padding: 11px;
-            border-radius: 8px;
-            margin-bottom: 18px;
-            text-align: center;
-        }
-
-        .link {
-            text-align: center;
-            margin-top: 22px;
-        }
-
-        .link a {
-            color: #2563eb;
-            text-decoration: none;
+            padding: 12px 14px;
+            margin-bottom: 16px;
+            border-radius: 12px;
+            background: #edfdf4;
+            border: 1px solid #bcebd0;
+            color: #177245;
+            font-size: 13px;
             font-weight: 600;
         }
 
+        .field {
+            margin-bottom: 12px;
+            position: relative;
+        }
+
+        .field-icon {
+            position: absolute;
+            left: 17px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 22px;
+            height: 22px;
+            color: #71809b;
+            pointer-events: none;
+        }
+
+        .field input {
+            width: 100%;
+            height: 50px;
+            border: 1px solid #d7dfec;
+            border-radius: 13px;
+            background: rgba(255,255,255,.98);
+            padding: 0 48px 0 50px;
+            color: #17233f;
+            font-size: 15px;
+            outline: none;
+            transition: .2s ease;
+        }
+
+        .field input::placeholder { color: #9aa6ba; }
+
+        .field input:focus {
+            border-color: #1582f5;
+            box-shadow: 0 0 0 4px rgba(21,130,245,.12);
+        }
+
+        .password-toggle {
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            border: 0;
+            background: transparent;
+            color: #71809b;
+            cursor: pointer;
+            padding: 5px;
+            font-size: 18px;
+        }
+
+        .form-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin: 3px 2px 15px;
+        }
+
+        .remember {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: #526078;
+            font-size: 13px;
+            cursor: pointer;
+        }
+
+        .remember input {
+            width: 17px;
+            height: 17px;
+            accent-color: #087af1;
+        }
+
+        .sign-in-btn {
+            width: 100%;
+            height: 50px;
+            border: 0;
+            border-radius: 13px;
+            background: linear-gradient(135deg, #087cf2, #075bd8);
+            color: #fff;
+            font-size: 16px;
+            font-weight: 800;
+            cursor: pointer;
+            box-shadow: 0 12px 25px rgba(8, 109, 229, .25);
+            transition: transform .18s ease, box-shadow .18s ease;
+        }
+
+        .sign-in-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 15px 30px rgba(8, 109, 229, .32);
+        }
+
+        .sign-in-btn:active { transform: translateY(0); }
+
+        .or-divider {
+            display: flex;
+            align-items: center;
+            gap: 13px;
+            margin: 16px 0;
+            color: #8a96aa;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .or-divider::before,
+        .or-divider::after {
+            content: "";
+            height: 1px;
+            flex: 1;
+            background: #dfe5ee;
+        }
+
+        .signup-text {
+            margin: 0;
+            text-align: center;
+            color: #69758b;
+            font-size: 14px;
+        }
+
+        .signup-text a {
+            color: #0878ef;
+            text-decoration: none;
+            font-weight: 800;
+        }
+
+        .signup-text a:hover { text-decoration: underline; }
+
+        .copyright {
+            margin-top: 12px;
+            text-align: center;
+            color: rgba(44, 61, 91, .65);
+            font-size: 11px;
+        }
+
+        @media (max-width: 900px) {
+            body {
+                background-position: left center;
+                background-attachment: scroll;
+            }
+
+            .login-page {
+                justify-content: center;
+                padding: 18px;
+                background: rgba(235,244,255,.25);
+            }
+
+            .login-card {
+                width: min(440px, 94vw);
+                padding: 24px 24px 20px;
+            }
+        }
+
+        @media (max-width: 520px) {
+            .login-page { padding: 16px; }
+            .login-card { padding: 22px 18px 18px; border-radius: 22px; }
+            .brand-name { font-size: 24px; }
+            .brand-icon { width: 52px; height: 52px; font-size: 24px; }
+            .heading { font-size: 24px; }
+            .field input, .sign-in-btn { height: 48px; }
+        }
     </style>
-
 </head>
-
 <body>
-
-<div class="auth-container">
-
-    <div class="auth-card">
-
-        <div class="logo">
-            SL
-        </div>
-
-        <h1>
-            Shop Ledger
-        </h1>
-
-        <div class="subtitle">
-            Sign in to continue
-        </div>
-
-
-        {% if error %}
-
-        <div class="error">
-            {{ error }}
-        </div>
-
-        {% endif %}
-
-
-        {% if request.args.get("registered") == "1" %}
-
-        <div class="success">
-            Account created successfully.
-            Please sign in.
-        </div>
-
-        {% endif %}
-
-
-        <form
-            method="POST"
-            action="{{ url_for('signin') }}"
-        >
-
-            <div class="form-group">
-
-                <label>
-                    Username
-                </label>
-
-                <input
-                    type="text"
-                    name="username"
-                    required
-                    autocomplete="username"
-                >
-
+    <main class="login-page">
+        <section class="login-card" aria-label="Shop Ledger Sign In">
+            <div class="brand">
+                <div class="brand-icon" aria-hidden="true">📱</div>
+                <div class="brand-name">Shop <span>Ledger</span></div>
             </div>
 
+            <div class="brand-subtitle">Mobile Shop Management</div>
 
-            <div class="form-group">
+            <h1 class="heading">Sign In</h1>
+            <p class="subheading">Access your shop dashboard</p>
 
-                <label>
-                    Password
-                </label>
+            {% if error %}
+                <div class="alert">{{ error }}</div>
+            {% endif %}
 
-                <input
-                    type="password"
-                    name="password"
-                    required
-                    autocomplete="current-password"
-                >
+            {% if request.args.get('registered') == '1' %}
+                <div class="success">Account created successfully. Please sign in.</div>
+            {% endif %}
 
-            </div>
+            <form method="POST" action="{{ url_for('signin') }}" autocomplete="on">
+                <div class="field">
+                    <svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                        <circle cx="12" cy="8" r="3.5"></circle>
+                        <path d="M5 20c.7-3.2 3.1-5 7-5s6.3 1.8 7 5"></path>
+                    </svg>
+                    <input type="text" name="username" placeholder="Username" autocomplete="username" required autofocus>
+                </div>
 
+                <div class="field">
+                    <svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                        <rect x="5" y="10" width="14" height="10" rx="2"></rect>
+                        <path d="M8 10V7a4 4 0 0 1 8 0v3"></path>
+                    </svg>
+                    <input id="password" type="password" name="password" placeholder="Password" autocomplete="current-password" required>
+                    <button class="password-toggle" type="button" id="togglePassword" aria-label="Show password">◉</button>
+                </div>
 
-            <button type="submit">
-                Sign In
-            </button>
+                <div class="form-row">
+                    <label class="remember">
+                        <input type="checkbox" name="remember">
+                        <span>Remember me</span>
+                    </label>
+                </div>
 
-        </form>
+                <button class="sign-in-btn" type="submit">➜ &nbsp; Sign In</button>
+            </form>
 
+            <div class="or-divider"><span>OR</span></div>
 
-        <div class="link">
+            <p class="signup-text">
+                Don't have an account?
+                <a href="{{ url_for('signup') }}">Sign Up</a>
+            </p>
 
-            Don't have an account?
+            <div class="copyright">Shop Ledger • Mobile Shop Management</div>
+        </section>
+    </main>
 
-            <a href="{{ url_for('signup') }}">
-                Sign Up
-            </a>
+    <script>
+        const passwordInput = document.getElementById('password');
+        const togglePassword = document.getElementById('togglePassword');
 
-        </div>
-
-    </div>
-
-</div>
-
+        togglePassword.addEventListener('click', function () {
+            const visible = passwordInput.type === 'text';
+            passwordInput.type = visible ? 'password' : 'text';
+            this.textContent = visible ? '◉' : '◌';
+            this.setAttribute('aria-label', visible ? 'Show password' : 'Hide password');
+        });
+    </script>
 </body>
-
 </html>

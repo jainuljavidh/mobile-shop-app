@@ -370,6 +370,8 @@ def signout():
 @app.before_request
 def require_login():
 
+    
+
     public_paths = (
         "/signin",
         "/signup",
@@ -401,6 +403,389 @@ def require_login():
     return redirect(
         url_for("signin")
     )
+
+
+
+# ===============================================================
+# USER MANAGEMENT
+# ===============================================================
+
+@app.route("/api/users", methods=["GET"])
+def get_users():
+
+    conn = None
+    cur = None
+
+    try:
+        conn = get_conn()
+        cur = conn.cursor(dictionary=True)
+
+        cur.execute(
+            """
+            SELECT
+                id,
+                username,
+                created_at
+            FROM users
+            ORDER BY id DESC
+            """
+        )
+
+        rows = cur.fetchall()
+
+        for row in rows:
+            if row.get("created_at"):
+                row["created_at"] = row["created_at"].isoformat()
+
+        return jsonify(rows)
+
+    except Exception as e:
+        print("GET USERS ERROR:", e)
+
+        return jsonify({
+            "error": str(e)
+        }), 500
+
+    finally:
+        if cur:
+            cur.close()
+
+        if conn:
+            conn.close()
+
+
+# ---------------------------------------------------------------
+# CREATE USER
+# ---------------------------------------------------------------
+
+@app.route("/api/users", methods=["POST"])
+def create_user():
+
+    data = request.get_json(force=True)
+
+    username = (
+        data.get("username")
+        or ""
+    ).strip()
+
+    password = (
+        data.get("password")
+        or ""
+    )
+
+    confirm_password = (
+        data.get("confirm_password")
+        or ""
+    )
+
+    if not username:
+        return jsonify({
+            "error": "Username is required."
+        }), 400
+
+    if len(username) < 3:
+        return jsonify({
+            "error": "Username must contain at least 3 characters."
+        }), 400
+
+    if not password:
+        return jsonify({
+            "error": "Password is required."
+        }), 400
+
+    if len(password) < 6:
+        return jsonify({
+            "error": "Password must contain at least 6 characters."
+        }), 400
+
+    if password != confirm_password:
+        return jsonify({
+            "error": "Passwords do not match."
+        }), 400
+
+    conn = None
+    cur = None
+
+    try:
+        conn = get_conn()
+        cur = conn.cursor(dictionary=True)
+
+        cur.execute(
+            """
+            SELECT id
+            FROM users
+            WHERE username = %s
+            LIMIT 1
+            """,
+            (username,)
+        )
+
+        existing_user = cur.fetchone()
+
+        if existing_user:
+            return jsonify({
+                "error": "Username already exists."
+            }), 409
+
+        password_hash = generate_password_hash(password)
+
+        cur.execute(
+            """
+            INSERT INTO users
+            (
+                username,
+                password_hash
+            )
+            VALUES
+            (
+                %s,
+                %s
+            )
+            """,
+            (
+                username,
+                password_hash
+            )
+        )
+
+        user_id = cur.lastrowid
+
+        conn.commit()
+
+        return jsonify({
+            "id": user_id,
+            "username": username,
+            "message": "User created successfully."
+        }), 201
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+
+        print("CREATE USER ERROR:", e)
+
+        return jsonify({
+            "error": str(e)
+        }), 500
+
+    finally:
+        if cur:
+            cur.close()
+
+        if conn:
+            conn.close()
+
+
+# ---------------------------------------------------------------
+# UPDATE USER
+# ---------------------------------------------------------------
+
+@app.route(
+    "/api/users/<int:user_id>",
+    methods=["PUT"]
+)
+def update_user(user_id):
+
+    data = request.get_json(force=True)
+
+    username = (
+        data.get("username")
+        or ""
+    ).strip()
+
+    password = (
+        data.get("password")
+        or ""
+    )
+
+    confirm_password = (
+        data.get("confirm_password")
+        or ""
+    )
+
+    if not username:
+        return jsonify({
+            "error": "Username is required."
+        }), 400
+
+    if len(username) < 3:
+        return jsonify({
+            "error": "Username must contain at least 3 characters."
+        }), 400
+
+    if password and len(password) < 6:
+        return jsonify({
+            "error": "Password must contain at least 6 characters."
+        }), 400
+
+    if password != confirm_password:
+        return jsonify({
+            "error": "Passwords do not match."
+        }), 400
+
+    conn = None
+    cur = None
+
+    try:
+        conn = get_conn()
+        cur = conn.cursor(dictionary=True)
+
+        cur.execute(
+            """
+            SELECT id
+            FROM users
+            WHERE id = %s
+            LIMIT 1
+            """,
+            (user_id,)
+        )
+
+        user = cur.fetchone()
+
+        if not user:
+            return jsonify({
+                "error": "User not found."
+            }), 404
+
+        cur.execute(
+            """
+            SELECT id
+            FROM users
+            WHERE username = %s
+            AND id <> %s
+            LIMIT 1
+            """,
+            (
+                username,
+                user_id
+            )
+        )
+
+        duplicate = cur.fetchone()
+
+        if duplicate:
+            return jsonify({
+                "error": "Username already exists."
+            }), 409
+
+        if password:
+            password_hash = generate_password_hash(password)
+
+            cur.execute(
+                """
+                UPDATE users
+                SET
+                    username = %s,
+                    password_hash = %s
+                WHERE id = %s
+                """,
+                (
+                    username,
+                    password_hash,
+                    user_id
+                )
+            )
+        else:
+            cur.execute(
+                """
+                UPDATE users
+                SET username = %s
+                WHERE id = %s
+                """,
+                (
+                    username,
+                    user_id
+                )
+            )
+
+        conn.commit()
+
+        if session.get("user_id") == user_id:
+            session["username"] = username
+
+        return jsonify({
+            "message": "User updated successfully."
+        })
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+
+        print("UPDATE USER ERROR:", e)
+
+        return jsonify({
+            "error": str(e)
+        }), 500
+
+    finally:
+        if cur:
+            cur.close()
+
+        if conn:
+            conn.close()
+
+
+# ---------------------------------------------------------------
+# DELETE USER
+# ---------------------------------------------------------------
+
+@app.route(
+    "/api/users/<int:user_id>",
+    methods=["DELETE"]
+)
+def delete_user(user_id):
+
+    if session.get("user_id") == user_id:
+        return jsonify({
+            "error": "You cannot delete the currently logged-in user."
+        }), 400
+
+    conn = None
+    cur = None
+
+    try:
+        conn = get_conn()
+        cur = conn.cursor(dictionary=True)
+
+        cur.execute(
+            """
+            DELETE FROM users
+            WHERE id = %s
+            """,
+            (user_id,)
+        )
+
+        deleted = cur.rowcount
+
+        conn.commit()
+
+        if deleted == 0:
+            return jsonify({
+                "error": "User not found."
+            }), 404
+
+        return jsonify({
+            "deleted": deleted,
+            "message": "User deleted successfully."
+        })
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+
+        print("DELETE USER ERROR:", e)
+
+        return jsonify({
+            "error": str(e)
+        }), 500
+
+    finally:
+        if cur:
+            cur.close()
+
+        if conn:
+            conn.close()
+
 
 
 # ===============================================================
@@ -466,6 +851,7 @@ def get_sales():
                 s.recharge_mobile,
                 s.recharge_id,
                 s.repair_id,
+                s.payment_id,
                 CASE
                     WHEN s.sale_type = 'Repair'
                          AND s.repair_id IS NOT NULL
@@ -515,6 +901,7 @@ def get_sales():
             row["recharge_mobile"] = row.get("recharge_mobile") or ""
             row["recharge_id"] = row.get("recharge_id")
             row["repair_id"] = row.get("repair_id")
+            row["payment_id"] = row.get("payment_id")
             row["repair_balance"] = to_float(
                 row.get("repair_balance")
             )
@@ -545,38 +932,49 @@ def add_sale():
 
     sale_date = data.get("sale_date") or date.today().isoformat()
     product_name = str(data.get("product_name") or "").strip()
+    customer_name = str(data.get("customer_name") or "").strip()
+    payment_type = str(data.get("payment_type") or "Full Payment").strip()
 
     try:
         quantity = int(data.get("quantity") or 0)
         amount = to_float(data.get("amount"))
         split_amount = to_float(data.get("split_amount"))
+        paid_amount = to_float(data.get("paid_amount"))
     except (ValueError, TypeError):
-        return jsonify({
-            "error": "Invalid quantity or amount"
-        }), 400
+        return jsonify({"error": "Invalid quantity or amount"}), 400
 
-    total_amount = amount + split_amount
+    total_amount = round(amount + split_amount, 2)
+    allow_negative_stock = data.get("allow_negative_stock") is True
 
-    # Negative stock is allowed only when the frontend sends
-    # a real JSON boolean: true.
-    allow_negative_stock = (
-        data.get("allow_negative_stock") is True
-    )
+    if payment_type not in ("Full Payment", "Partial Payment", "Credit"):
+        return jsonify({"error": "Invalid payment type"}), 400
+
+    payment_method = data.get("payment_method") or "Cash"
+    if payment_type in ("Credit", "Partial Payment") and payment_method not in PAYMENT_METHODS:
+        return jsonify({"error": "Invalid payment method"}), 400
 
     if not product_name:
-        return jsonify({
-            "error": "Product name is required"
-        }), 400
-
+        return jsonify({"error": "Product name is required"}), 400
     if quantity <= 0:
-        return jsonify({
-            "error": "Quantity must be greater than 0"
-        }), 400
+        return jsonify({"error": "Quantity must be greater than 0"}), 400
+    if total_amount <= 0:
+        return jsonify({"error": "Total amount must be greater than 0"}), 400
+    if paid_amount < 0 or paid_amount > total_amount:
+        return jsonify({"error": "Paid amount must be between 0 and total amount"}), 400
 
-    if amount < 0 or split_amount < 0:
-        return jsonify({
-            "error": "Amount cannot be negative"
-        }), 400
+    if payment_type == "Full Payment":
+        paid_amount = total_amount
+    elif payment_type == "Credit":
+        paid_amount = 0
+    elif payment_type == "Partial Payment":
+        if paid_amount <= 0 or paid_amount >= total_amount:
+            return jsonify({"error": "For Partial Payment, paid amount must be less than the total amount"}), 400
+
+    if payment_type in ("Credit", "Partial Payment") and not customer_name:
+        return jsonify({"error": "Customer name is required for credit or partial payment"}), 400
+
+    balance_amount = round(total_amount - paid_amount, 2)
+    status = "Paid" if balance_amount == 0 else ("Partial" if paid_amount > 0 else "Pending")
 
     conn = None
     cur = None
@@ -585,153 +983,121 @@ def add_sale():
         conn = get_conn()
         cur = conn.cursor(dictionary=True)
 
-        # -------------------------------------------------------
-        # Find and lock inventory row when it exists.
-        # A product does NOT need to exist in Inventory in order
-        # to be recorded as a sale.
-        # -------------------------------------------------------
-
+        # Lock inventory. The item leaves stock even when payment is credit/partial.
         cur.execute("""
-            SELECT
-                id,
-                product_name,
-                quantity
+            SELECT id, product_name, quantity
             FROM inventory
             WHERE product_name = %s
             ORDER BY id
             LIMIT 1
             FOR UPDATE
-        """, (
-            product_name,
-        ))
-
+        """, (product_name,))
         inventory = cur.fetchone()
 
-        # -------------------------------------------------------
-        # PRODUCT NOT IN INVENTORY
-        # -------------------------------------------------------
-        # Record the sale normally. Since there is no inventory
-        # row, there is no stock to reduce.
-        # -------------------------------------------------------
+        if inventory:
+            current_stock = int(inventory["quantity"] or 0)
+            if current_stock < quantity and not allow_negative_stock:
+                conn.rollback()
+                return jsonify({
+                    "error": (
+                        f"Insufficient stock for '{product_name}'. "
+                        f"Available: {current_stock}, Required: {quantity}. "
+                        "Enable 'Allow Negative Stock' to continue."
+                    )
+                }), 400
 
-        if not inventory:
+        payment_id = None
+        sale_id = None
 
+        # Credit/partial creates one Payment Tracking record automatically.
+        if payment_type in ("Credit", "Partial Payment"):
             cur.execute("""
-                INSERT INTO sales (
+                INSERT INTO payments
+                (
+                    payment_date,
+                    customer_name,
+                    reference_name,
+                    total_amount,
+                    paid_amount,
+                    balance_amount,
+                    payment_method,
+                    status,
+                    notes
+                )
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            """, (
+                sale_date,
+                customer_name,
+                product_name,
+                total_amount,
+                paid_amount,
+                balance_amount,
+                data.get("payment_method") or "Cash",
+                status,
+                "Created automatically from Sales"
+            ))
+            payment_id = cur.lastrowid
+
+        # Only the money actually received today is recorded in Sales.
+        if paid_amount > 0:
+            cur.execute("""
+                INSERT INTO sales
+                (
                     sale_date,
                     product_name,
                     quantity,
                     amount,
                     split_amount,
                     total_amount,
-                    sale_type
+                    sale_type,
+                    payment_id
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, 'Product')
+                VALUES (%s,%s,%s,%s,0,%s,'Product',%s)
             """, (
                 sale_date,
                 product_name,
-                quantity,
-                amount,
-                split_amount,
-                total_amount
+                quantity if payment_type == "Full Payment" else 0,
+                paid_amount,
+                paid_amount,
+                payment_id
             ))
-
             sale_id = cur.lastrowid
-            conn.commit()
 
-            return jsonify({
-                "message": "Sale added successfully. Product was not in inventory, so stock was not changed.",
-                "id": sale_id,
-                "inventory_updated": False
-            }), 201
+        # Stock is reduced once, when the item is sold, regardless of payment status.
+        if inventory:
+            cur.execute("""
+                UPDATE inventory
+                SET quantity = quantity - %s
+                WHERE id = %s
+            """, (quantity, inventory["id"]))
 
-        current_stock = int(
-            inventory["quantity"] or 0
-        )
-
-        # -------------------------------------------------------
-        # STOCK CHECK FOR PRODUCTS THAT EXIST IN INVENTORY
-        # -------------------------------------------------------
-
-        if (
-            current_stock < quantity
-            and not allow_negative_stock
-        ):
-            conn.rollback()
-
-            return jsonify({
-                "error": (
-                    f"Insufficient stock for '{product_name}'. "
-                    f"Available: {current_stock}, "
-                    f"Required: {quantity}. "
-                    f"Enable 'Allow Negative Stock' to continue."
-                )
-            }), 400
-
-        # -------------------------------------------------------
-        # Insert sale
-        # -------------------------------------------------------
-
-        cur.execute("""
-            INSERT INTO sales (
-                sale_date,
-                product_name,
-                quantity,
-                amount,
-                split_amount,
-                total_amount,
-                sale_type
-            )
-            VALUES (%s, %s, %s, %s, %s, %s, 'Product')
-        """, (
-            sale_date,
-            product_name,
-            quantity,
-            amount,
-            split_amount,
-            total_amount
-        ))
-
-        # -------------------------------------------------------
-        # Reduce stock only when an inventory row exists.
-        # Negative result is allowed only when explicitly enabled.
-        # -------------------------------------------------------
-
-        cur.execute("""
-            UPDATE inventory
-            SET quantity = quantity - %s
-            WHERE id = %s
-        """, (
-            quantity,
-            inventory["id"]
-        ))
-
-        sale_id = cur.lastrowid
         conn.commit()
 
+        if payment_type == "Credit":
+            message = "Credit sale saved. It was added to Payment Tracking, not Sales."
+        elif payment_type == "Partial Payment":
+            message = "Partial sale saved. Received amount added to Sales and balance added to Payment Tracking."
+        else:
+            message = "Sale added successfully."
+
         return jsonify({
-            "message": "Sale added successfully",
+            "message": message,
             "id": sale_id,
-            "inventory_updated": True
+            "payment_id": payment_id,
+            "inventory_updated": bool(inventory),
+            "sale_amount": paid_amount,
+            "balance_amount": balance_amount
         }), 201
 
     except Exception as e:
-
         if conn:
             conn.rollback()
-
-        return jsonify({
-            "error": str(e)
-        }), 500
-
+        return jsonify({"error": str(e)}), 500
     finally:
-
         if cur:
             cur.close()
-
         if conn:
             conn.close()
-
 
 # UPDATE SALE
 # ---------------------------------------------------------------
@@ -825,6 +1191,13 @@ def update_sale(sale_id):
             return jsonify({
                 "error":
                     "Repair sales cannot be edited from Product Sales"
+            }), 400
+
+        if old_sale.get("payment_id") is not None:
+
+            return jsonify({
+                "error":
+                    "Payment-linked sales cannot be edited from Product Sales. Edit the Payment Tracking record instead."
             }), 400
 
         # -------------------------------------------------------
@@ -1021,6 +1394,12 @@ def delete_sale(sale_id):
             conn.rollback()
             return jsonify({
                 "error": "Processed repair sales cannot be deleted here"
+            }), 400
+
+        if sale.get("payment_id") is not None:
+            conn.rollback()
+            return jsonify({
+                "error": "Payment-linked sales cannot be deleted. Edit the Payment Tracking record instead."
             }), 400
 
         product_name = sale["product_name"]
@@ -3603,115 +3982,39 @@ def add_payment():
 )
 def update_payment(payment_id):
 
-    data = request.get_json(force=True)
+    data = request.get_json(force=True) or {}
 
-    payment_date = (
-        data.get("payment_date")
-        or date.today().isoformat()
-    )
-
-    customer_name = (
-        data.get("customer_name")
-        or ""
-    ).strip()
-
-    reference_name = (
-        data.get("reference_name")
-        or ""
-    ).strip()
-
-    total_amount = to_float(
-        data.get("total_amount")
-    )
-
-    paid_amount = to_float(
-        data.get("paid_amount")
-    )
-
-    payment_method = (
-        data.get("payment_method")
-        or "Cash"
-    )
-
-    notes = (
-        data.get("notes")
-        or ""
-    ).strip()
-
-    if not customer_name:
-
-        return jsonify({
-            "error": "customer_name is required"
-        }), 400
-
-    if not reference_name:
-
-        return jsonify({
-            "error": "reference_name is required"
-        }), 400
-
-    if total_amount <= 0:
-
-        return jsonify({
-            "error": "total_amount must be greater than 0"
-        }), 400
-
-    if paid_amount < 0:
-
-        return jsonify({
-            "error": "paid_amount cannot be negative"
-        }), 400
-
-    if paid_amount > total_amount:
-
-        return jsonify({
-            "error": "paid_amount cannot be greater than total_amount"
-        }), 400
-
-    if payment_method not in PAYMENT_METHODS:
-
-        return jsonify({
-            "error": "Invalid payment method"
-        }), 400
-
-    balance_amount = (
-        total_amount -
-        paid_amount
-    )
-
-    if paid_amount == 0:
-
-        status = "Pending"
-
-    elif paid_amount < total_amount:
-
-        status = "Partial"
-
-    else:
-
-        status = "Paid"
-
-    conn = get_conn()
-    cur = conn.cursor()
+    payment_date = data.get("payment_date") or date.today().isoformat()
+    customer_name = str(data.get("customer_name") or "").strip()
+    reference_name = str(data.get("reference_name") or "").strip()
+    payment_method = data.get("payment_method") or "Cash"
+    notes = str(data.get("notes") or "").strip()
 
     try:
+        additional_payment = to_float(data.get("additional_payment", 0))
+    except (ValueError, TypeError):
+        return jsonify({"error": "Invalid additional payment amount"}), 400
 
-        cur.execute(
-            """
-            UPDATE payments
-            SET
-                payment_date=%s,
-                customer_name=%s,
-                reference_name=%s,
-                total_amount=%s,
-                paid_amount=%s,
-                balance_amount=%s,
-                payment_method=%s,
-                status=%s,
-                notes=%s
-            WHERE id=%s
-            """,
-            (
+    if not customer_name:
+        return jsonify({"error": "customer_name is required"}), 400
+    if not reference_name:
+        return jsonify({"error": "reference_name is required"}), 400
+    if additional_payment < 0:
+        return jsonify({"error": "Additional payment cannot be negative"}), 400
+    if payment_method not in PAYMENT_METHODS:
+        return jsonify({"error": "Invalid payment method"}), 400
+
+    conn = None
+    cur = None
+
+    try:
+        conn = get_conn()
+        cur = conn.cursor(dictionary=True)
+
+        # Lock the outstanding record so two users cannot collect the same balance.
+        cur.execute("""
+            SELECT
+                id,
                 payment_date,
                 customer_name,
                 reference_name,
@@ -3720,22 +4023,98 @@ def update_payment(payment_id):
                 balance_amount,
                 payment_method,
                 status,
-                notes,
+                notes
+            FROM payments
+            WHERE id = %s
+            FOR UPDATE
+        """, (payment_id,))
+
+        payment = cur.fetchone()
+        if not payment:
+            return jsonify({"error": "Payment record not found"}), 404
+
+        old_paid = to_float(payment["paid_amount"])
+        old_balance = to_float(payment["balance_amount"])
+        total_amount = to_float(payment["total_amount"])
+
+        if additional_payment > old_balance:
+            return jsonify({
+                "error": f"Payment cannot be greater than the pending balance of ₹{old_balance:.2f}"
+            }), 400
+
+        new_paid = round(old_paid + additional_payment, 2)
+        new_balance = round(total_amount - new_paid, 2)
+        status = "Paid" if new_balance == 0 else ("Partial" if new_paid > 0 else "Pending")
+
+        # Every new amount actually received becomes a new Sales entry on THIS date.
+        sale_id = None
+        if additional_payment > 0:
+            cur.execute("""
+                INSERT INTO sales
+                (
+                    sale_date,
+                    product_name,
+                    quantity,
+                    amount,
+                    split_amount,
+                    total_amount,
+                    sale_type,
+                    payment_id
+                )
+                VALUES (%s,%s,0,%s,0,%s,'Credit Payment',%s)
+            """, (
+                payment_date,
+                reference_name,
+                additional_payment,
+                additional_payment,
                 payment_id
-            )
-        )
+            ))
+            sale_id = cur.lastrowid
+
+        cur.execute("""
+            UPDATE payments
+            SET
+                payment_date=%s,
+                customer_name=%s,
+                reference_name=%s,
+                paid_amount=%s,
+                balance_amount=%s,
+                payment_method=%s,
+                status=%s,
+                notes=%s
+            WHERE id=%s
+        """, (
+            payment_date,
+            customer_name,
+            reference_name,
+            new_paid,
+            new_balance,
+            payment_method,
+            status,
+            notes,
+            payment_id
+        ))
 
         conn.commit()
 
         return jsonify({
-            "updated":
-                cur.rowcount
+            "updated": cur.rowcount,
+            "payment_received_now": additional_payment,
+            "paid_amount": new_paid,
+            "balance_amount": new_balance,
+            "status": status,
+            "sale_id": sale_id
         })
 
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        return jsonify({"error": str(e)}), 500
     finally:
-
-        cur.close()
-        conn.close()
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
 
 
 # ===============================================================
@@ -3752,6 +4131,21 @@ def delete_payment(payment_id):
     cur = conn.cursor()
 
     try:
+
+        cur.execute(
+            """
+            SELECT COUNT(*) AS total
+            FROM sales
+            WHERE payment_id = %s
+            """,
+            (payment_id,)
+        )
+
+        linked = cur.fetchone()
+        if linked and int(linked[0] or 0) > 0:
+            return jsonify({
+                "error": "This payment has Sales entries linked to it and cannot be deleted."
+            }), 400
 
         cur.execute(
             """
@@ -4102,16 +4496,13 @@ def summary():
                 0
             ) AS total
             FROM payments
-            WHERE payment_date >= %s
-            AND payment_date < DATE_ADD(
+            WHERE payment_date < DATE_ADD(
                 %s,
                 INTERVAL 1 MONTH
             )
+              AND balance_amount > 0
             """,
-            (
-                f"{m}-01",
-                f"{m}-01"
-            )
+            (f"{m}-01",)
         )
 
         # =======================================================

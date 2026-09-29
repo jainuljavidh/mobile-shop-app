@@ -199,6 +199,39 @@
 
     
 
+
+<style>
+.header-actions {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.logged-in-user {
+    white-space: nowrap;
+    font-size: 14px;
+    color: #ffffff;
+}
+
+.signout-button {
+    border: none;
+    padding: 9px 14px;
+    border-radius: 7px;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.user-edit-button,
+.user-delete-button {
+    border: none;
+    padding: 7px 11px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    margin-right: 6px;
+}
+</style>
 </head>
 
 
@@ -298,20 +331,70 @@
                     </button>
 
                 </div>
-                
 
             </div>
-            <form method="POST" action="{{ url_for('signout') }}">
-        <button type="submit" class="signout-button">
-            Sign Out
-        </button>
-    </form>
+
+            <div class="header-actions">
+
+                <span class="logged-in-user">
+                    User: <strong>{{ session.get("username", "") }}</strong>
+                </span>
+
+                <form method="POST" action="{{ url_for('signout') }}">
+                    <button type="submit" class="signout-button">
+                        Sign Out
+                    </button>
+                </form>
+
+            </div>
+            
 
         </div>
-        
-        <div class="header-actions">
-    
-</div>
+        <!-- SECTION NAVIGATION -->
+
+<nav class="section-nav" id="sectionNavigation" aria-label="Shop sections">
+
+    <button type="button" class="section-nav-btn active" data-section="dashboardSection">
+        Dashboard
+    </button>
+
+    <button type="button" class="section-nav-btn" data-section="masterSection">
+        Master
+    </button>
+
+    <button type="button" class="section-nav-btn" data-section="salesSection">
+        Sales
+    </button>
+
+    <button type="button" class="section-nav-btn" data-section="purchasesSection">
+        Purchases
+    </button>
+
+    <button type="button" class="section-nav-btn" data-section="inventorySection">
+        Inventory
+    </button>
+
+    <button type="button" class="section-nav-btn" data-section="expensesSection">
+        Expenses
+    </button>
+
+    <button type="button" class="section-nav-btn" data-section="enquiriesSection">
+        Enquiries
+    </button>
+
+    <button type="button" class="section-nav-btn" data-section="repairsSection">
+        Repairs Tracker
+    </button>
+
+    <button type="button" class="section-nav-btn" data-section="userManagementSection">
+        User Management
+    </button>
+
+    <button type="button" class="section-nav-btn" data-section="paymentsSection">
+        Payment Tracking
+    </button>
+
+</nav>
 
     </header>
 
@@ -526,47 +609,7 @@
 
 </section>
     
-<!-- SECTION NAVIGATION -->
 
-<nav class="section-nav" id="sectionNavigation" aria-label="Shop sections">
-
-    <button type="button" class="section-nav-btn active" data-section="dashboardSection">
-        Dashboard
-    </button>
-
-    <button type="button" class="section-nav-btn" data-section="masterSection">
-        Master
-    </button>
-
-    <button type="button" class="section-nav-btn" data-section="salesSection">
-        Sales
-    </button>
-
-    <button type="button" class="section-nav-btn" data-section="purchasesSection">
-        Purchases
-    </button>
-
-    <button type="button" class="section-nav-btn" data-section="inventorySection">
-        Inventory
-    </button>
-
-    <button type="button" class="section-nav-btn" data-section="expensesSection">
-        Expenses
-    </button>
-
-    <button type="button" class="section-nav-btn" data-section="enquiriesSection">
-        Enquiries
-    </button>
-
-    <button type="button" class="section-nav-btn" data-section="repairsSection">
-        Repairs Tracker
-    </button>
-
-    <button type="button" class="section-nav-btn" data-section="paymentsSection">
-        Payment Tracking
-    </button>
-
-</nav>
 
 
 
@@ -712,17 +755,16 @@
 
     <form class="entry-form" id="salesForm">
 
-    <select
-        name="part_item_selector"
-        id="salesPartItem"
+    <input
+        type="text"
+        name="customer_name"
+        placeholder="Customer name (required for credit / partial)"
     >
-        <option value="">Select Part / Item (optional)</option>
-    </select>
 
     <input
         type="text"
         name="product_name"
-        placeholder="Product name (or choose Part / Item)"
+        placeholder="Product name"
         required
     >
 
@@ -739,10 +781,26 @@
     <input
         type="number"
         name="amount"
-        placeholder="Amount"
+        placeholder="Total amount"
         step="0.01"
         min="0"
         required
+    >
+
+    <select name="payment_type" id="salesPaymentType" required>
+        <option value="Full Payment">Full Payment</option>
+        <option value="Partial Payment">Partial Payment</option>
+        <option value="Credit">Credit</option>
+    </select>
+
+    <input
+        type="number"
+        name="paid_amount"
+        id="salesPaidAmount"
+        placeholder="Paid amount"
+        step="0.01"
+        min="0"
+        value=""
     >
 
     <label class="negative-stock-option">
@@ -1752,7 +1810,7 @@
             type="text"
             name="customer_name"
             placeholder="Customer name"
-            
+            required
         >
 
 
@@ -1793,14 +1851,13 @@
         >
 
 
-        <!-- PART / ITEM -->
+        <!-- PART REQUEST -->
 
-        <select
+        <input
+            type="text"
             name="part_request"
-            id="repairPartItem"
+            placeholder="Part request"
         >
-            <option value="">Select Part / Item (optional)</option>
-        </select>
 
 
         <!-- AMOUNT -->
@@ -1998,6 +2055,86 @@
 </section>
 
 
+        <!-- =================================================
+             USER MANAGEMENT
+        ================================================== -->
+
+        <section
+            id="userManagementSection"
+            class="ledger-card accent-inventory"
+            aria-label="User Management"
+        >
+
+            <div class="ledger-head">
+                <h2>User Management</h2>
+                <p class="ledger-sub">Create a new login account for the application</p>
+            </div>
+
+            <div class="master-help">
+                <strong>Create User:</strong> Enter a username and password below.
+                The password will be securely stored as a password hash.
+            </div>
+
+            <form class="entry-form" id="userManagementForm" autocomplete="off">
+
+                <input
+                    type="text"
+                    id="userManagementUsername"
+                    name="username"
+                    placeholder="Username"
+                    minlength="3"
+                    maxlength="100"
+                    required
+                    autocomplete="off"
+                >
+
+                <input
+                    type="password"
+                    id="userManagementPassword"
+                    name="password"
+                    placeholder="Password (minimum 6 characters)"
+                    minlength="6"
+                    required
+                    autocomplete="new-password"
+                >
+
+                <input
+                    type="password"
+                    id="userManagementConfirmPassword"
+                    name="confirm_password"
+                    placeholder="Confirm password"
+                    minlength="6"
+                    required
+                    autocomplete="new-password"
+                >
+
+                <button type="submit">Create User</button>
+
+            </form>
+
+            <div class="ledger-head" style="margin-top: 24px;">
+                <h3>Created Users</h3>
+                <p class="ledger-sub">List of login accounts created for this application</p>
+            </div>
+
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>S.NO</th>
+                            <th>Username</th>
+                            <th>Created Date &amp; Time</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="usersManagementBody">
+                    </tbody>
+                </table>
+            </div>
+
+        </section>
+
+
     </main>
 
 
@@ -2051,6 +2188,246 @@
     <script
         src="{{ url_for('static', filename='js/app.js') }}"
     ></script>
+
+
+    <script>
+        // ============================================================
+        // USER MANAGEMENT - CREATE USER
+        // ============================================================
+
+        (function () {
+            const form = document.getElementById('userManagementForm');
+
+            if (!form) {
+                return;
+            }
+
+            form.addEventListener('submit', async function (event) {
+                event.preventDefault();
+
+                const username = document.getElementById('userManagementUsername').value.trim();
+                const password = document.getElementById('userManagementPassword').value;
+                const confirmPassword = document.getElementById('userManagementConfirmPassword').value;
+
+                if (username.length < 3) {
+                    alert('Username must contain at least 3 characters.');
+                    return;
+                }
+
+                if (password.length < 6) {
+                    alert('Password must contain at least 6 characters.');
+                    return;
+                }
+
+                if (password !== confirmPassword) {
+                    alert('Passwords do not match.');
+                    return;
+                }
+
+                try {
+                    const response = await fetch('/api/users', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            username: username,
+                            password: password,
+                            confirm_password: confirmPassword
+                        })
+                    });
+
+                    const result = await response.json();
+
+                    if (!response.ok) {
+                        throw new Error(result.error || 'Unable to create user.');
+                    }
+
+                    alert('User created successfully.');
+                    form.reset();
+                    loadManagedUsers();
+
+                } catch (error) {
+                    console.error('USER CREATE ERROR:', error);
+                    alert(error.message || 'Unable to create user.');
+                }
+            });
+        })();
+
+        async function loadManagedUsers() {
+            const body = document.getElementById('usersManagementBody');
+
+            if (!body) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/users');
+                const users = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(users.error || 'Unable to load users.');
+                }
+
+                if (!Array.isArray(users) || users.length === 0) {
+                    body.innerHTML = `
+                        <tr>
+                            <td colspan="4" style="text-align:center;">
+                                No users created yet.
+                            </td>
+                        </tr>
+                    `;
+                    return;
+                }
+
+                body.innerHTML = users.map(function (user, index) {
+                    return `
+                        <tr>
+                            <td>${index + 1}</td>
+                            <td>${escapeUserHtml(user.username || '')}</td>
+                            <td>${escapeUserHtml(user.created_at || '')}</td>
+                            <td>
+                                <button type="button" class="user-edit-button" onclick="editManagedUser(${Number(user.id)}, '${escapeUserJs(user.username || '')}')">Edit</button>
+                                <button type="button" class="user-delete-button" onclick="deleteManagedUser(${Number(user.id)}, '${escapeUserJs(user.username || '')}')">Delete</button>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+
+            } catch (error) {
+                console.error('USER LIST ERROR:', error);
+                body.innerHTML = `
+                    <tr>
+                        <td colspan="3" style="text-align:center;">
+                            Unable to load users.
+                        </td>
+                    </tr>
+                `;
+            }
+        }
+
+        function escapeUserHtml(value) {
+            return String(value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        function escapeUserJs(value) {
+            return String(value)
+                .replace(/\\/g, '\\\\')
+                .replace(/'/g, "\\'")
+                .replace(/\r/g, '')
+                .replace(/\n/g, ' ');
+        }
+
+        async function editManagedUser(userId, currentUsername) {
+            const newUsername = window.prompt(
+                'Enter username:',
+                currentUsername
+            );
+
+            if (newUsername === null) {
+                return;
+            }
+
+            const username = newUsername.trim();
+
+            if (username.length < 3) {
+                alert('Username must contain at least 3 characters.');
+                return;
+            }
+
+            const newPassword = window.prompt(
+                'Enter new password.\n\nLeave blank if you only want to change the username.\nMinimum 6 characters:',
+                ''
+            );
+
+            if (newPassword === null) {
+                return;
+            }
+
+            let confirmPassword = '';
+
+            if (newPassword !== '') {
+                confirmPassword = window.prompt('Confirm new password:');
+
+                if (confirmPassword === null) {
+                    return;
+                }
+
+                if (newPassword !== confirmPassword) {
+                    alert('Passwords do not match.');
+                    return;
+                }
+            }
+
+            try {
+                const response = await fetch('/api/users/' + userId, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        username: username,
+                        password: newPassword,
+                        confirm_password: confirmPassword
+                    })
+                });
+
+                const result = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(result.error || 'Unable to update user.');
+                }
+
+                alert('User updated successfully.');
+                loadManagedUsers();
+
+                // Update the username displayed near Sign Out if this is the logged-in user.
+                const loggedUser = document.querySelector('.logged-in-user strong');
+                if (loggedUser && currentUsername === loggedUser.textContent) {
+                    loggedUser.textContent = username;
+                }
+
+            } catch (error) {
+                console.error('USER UPDATE ERROR:', error);
+                alert(error.message || 'Unable to update user.');
+            }
+        }
+
+        async function deleteManagedUser(userId, username) {
+            const confirmed = window.confirm(
+                'Delete user "' + username + '"?\n\n' +
+                'This user will no longer be able to sign in.'
+            );
+
+            if (!confirmed) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/users/' + userId, {
+                    method: 'DELETE'
+                });
+
+                const result = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(result.error || 'Unable to delete user.');
+                }
+
+                alert('User deleted successfully.');
+                loadManagedUsers();
+
+            } catch (error) {
+                console.error('USER DELETE ERROR:', error);
+                alert(error.message || 'Unable to delete user.');
+            }
+        }
+
+        loadManagedUsers();
+    </script>
     <script>
         // ============================================================
         // SECTION NAVIGATION
