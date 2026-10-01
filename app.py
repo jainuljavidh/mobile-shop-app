@@ -2,6 +2,7 @@
 
 import os
 from datetime import date, datetime, timedelta, timezone
+import traceback
 
 from flask import (
     Flask,
@@ -789,6 +790,705 @@ def delete_user(user_id):
 
 
 # ===============================================================
+# CUSTOMER LEDGER
+# ===============================================================
+
+@app.route("/api/customer-ledger", methods=["GET"])
+def get_customer_ledger():
+    """
+    Return one customer's complete ledger.
+
+    IMPORTANT:
+    - Product sales come from sales table.
+    - Credit sales remain visible from the original payments record
+      even after the balance is fully cleared.
+    - Later Credit Payment sales rows are shown separately as credits.
+    - Repair charge comes from repairs.amount only after the repair
+      is Delivered to Customer.
+    - repairs.advance is the cumulative total amount received for
+      that repair.
+    - Repair rows in sales are excluded from this ledger so the
+      repair is not counted twice.
+    - Before delivery, a repair advance is NOT shown in the ledger.
+    """
+
+    search = str(request.args.get("q") or "").strip()
+
+    if not search:
+        return jsonify({
+            "error": "Enter customer name or mobile number"
+        }), 400
+
+    conn = None
+    cur = None
+
+    try:
+        conn = get_conn()
+        cur = dict_cursor(conn)
+
+        # -------------------------------------------------------------
+        # MOBILE NUMBER SEARCH
+        # -------------------------------------------------------------
+        # Mobile number is the customer's main identifier.
+        # First resolve the customer name from the mobile number.
+        # Then search the complete ledger by that customer name.
+        #
+        # This makes:
+        #   Search by NAME   -> complete customer ledger
+        #   Search by NUMBER -> the SAME complete customer ledger
+        #
+        # Older records may not have customer_number saved, so directly
+        # filtering every transaction by number can miss those records.
+        # -------------------------------------------------------------
+
+        search_is_number = (
+            any(ch.isdigit() for ch in search)
+            and not any(ch.isalpha() for ch in search)
+        )
+
+        ledger_search = search
+
+        if search_is_number:
+
+            normalized_number = (
+                search
+                .replace(" ", "")
+                .replace("-", "")
+                .replace("(", "")
+                .replace(")", "")
+            )
+
+            cur.execute(
+                """
+                SELECT customer_name
+                FROM (
+                    SELECT
+                        customer_name,
+                        customer_number,
+                        sale_date AS transaction_date,
+                        id AS sort_id
+                    FROM sales
+                    WHERE customer_number IS NOT NULL
+                      AND REPLACE(
+                            REPLACE(
+                                REPLACE(
+                                    REPLACE(customer_number, ' ', ''),
+                                    '-', ''
+                                ),
+                                '(',
+                                ''
+                            ),
+                            ')',
+                            ''
+                          ) = %s
+
+                    UNION ALL
+
+                    SELECT
+                        customer_name,
+                        customer_number,
+                        payment_date AS transaction_date,
+                        id AS sort_id
+                    FROM payments
+                    WHERE customer_number IS NOT NULL
+                      AND REPLACE(
+                            REPLACE(
+                                REPLACE(
+                                    REPLACE(customer_number, ' ', ''),
+                                    '-', ''
+                                ),
+                                '(',
+                                ''
+                            ),
+                            ')',
+                            ''
+                          ) = %s
+
+                    UNION ALL
+
+                    SELECT
+                        customer_name,
+                        customer_number,
+                        repair_date AS transaction_date,
+                        id AS sort_id
+                    FROM repairs
+                    WHERE customer_number IS NOT NULL
+                      AND REPLACE(
+                            REPLACE(
+                                REPLACE(
+                                    REPLACE(customer_number, ' ', ''),
+                                    '-', ''
+                                ),
+                                '(',
+                                ''
+                            ),
+                            ')',
+                            ''
+                          ) = %s
+                ) customer_history
+                WHERE customer_name IS NOT NULL
+                  AND TRIM(customer_name) <> ''
+                ORDER BY transaction_date DESC, sort_id DESC
+                LIMIT 1
+                """,
+                (
+                    normalized_number,
+                    normalized_number,
+                    normalized_number
+                )
+            )
+
+            number_customer = cur.fetchone()
+
+            if number_customer and number_customer.get("customer_name"):
+                # Use the resolved customer name so all historical
+                # transactions belonging to that customer are returned.
+                ledger_search = str(
+                    number_customer["customer_name"]
+                ).strip()
+
+        like = f"%{ledger_search}%"
+
+        cur.execute("""
+            SELECT *
+            FROM (
+                
+                /* =====================================================
+                   1. SALES
+                   ===================================================== */
+
+                SELECT
+                    s.sale_date AS transaction_date,
+
+                    CASE
+                        WHEN s.sale_type = 'Repair'
+                        THEN 'Repair'
+                        ELSE 'Sale'
+                    END AS transaction_type,
+
+                    s.product_name AS description,
+
+                    CASE
+                        /* A payment-linked sale already has its charge
+                           represented by the Payment record. */
+                        WHEN s.payment_id IS NOT NULL
+                        THEN COALESCE(
+                            p.total_amount,
+                            s.total_amount,
+                            0
+                        )
+                        ELSE COALESCE(
+                            s.total_amount,
+                            0
+                        )
+                    END AS debit_amount,
+
+                    /* For a payment-linked Product sale, this is the
+                       amount actually received on the original sale date.
+                       Later balance payments are separate Credit Payment
+                       rows and are added below. */
+                    CASE
+                        WHEN s.payment_id IS NOT NULL
+                        THEN COALESCE(s.total_amount, 0)
+                        ELSE COALESCE(s.total_amount, 0)
+                    END AS credit_amount,
+
+                    COALESCE(
+                        s.customer_name,
+                        p.customer_name,
+                        ''
+                    ) AS customer_name,
+
+                    COALESCE(
+                        s.customer_number,
+                        p.customer_number,
+                        ''
+                    ) AS customer_number,
+
+                    s.id AS sort_id
+
+                FROM sales s
+
+                LEFT JOIN payments p
+                    ON p.id = s.payment_id
+
+                WHERE s.sale_type <> 'Credit Payment'
+                  AND s.sale_type <> 'Repair'
+
+                  AND (
+                      COALESCE(
+                          s.customer_name,
+                          p.customer_name,
+                          ''
+                      ) LIKE %s
+
+                      OR
+
+                      COALESCE(
+                          s.customer_number,
+                          p.customer_number,
+                          ''
+                      ) LIKE %s
+                  )
+
+
+                UNION ALL
+
+
+                /* =====================================================
+                   2. PAYMENTS / CREDIT SALES
+                   ===================================================== */
+
+                SELECT
+
+                    p.payment_date AS transaction_date,
+
+                    CASE
+                        WHEN EXISTS (
+                            SELECT 1
+                            FROM sales ps
+                            WHERE ps.payment_id = p.id
+                              AND ps.sale_type <> 'Credit Payment'
+                        )
+                        THEN 'Payment'
+
+                        ELSE 'Credit Sale'
+                    END AS transaction_type,
+
+                    COALESCE(
+                        NULLIF(
+                            p.reference_name,
+                            ''
+                        ),
+                        'Payment received'
+                    ) AS description,
+
+                    CASE
+                        WHEN EXISTS (
+                            SELECT 1
+                            FROM sales ps
+                            WHERE ps.payment_id = p.id
+                              AND ps.sale_type <> 'Credit Payment'
+                        )
+                        THEN 0
+
+                        ELSE COALESCE(
+                            p.total_amount,
+                            0
+                        )
+                    END AS debit_amount,
+
+                    /* For a pure Credit Sale there is no original
+                       Sales row, so this row represents only the original
+                       charge. Any money received later is represented by
+                       separate Credit Payment rows below.
+                       For Full/Partial sales, the original Sales row above
+                       already contains the amount received on sale day. */
+                    0 AS credit_amount,
+
+                    p.customer_name,
+
+                    COALESCE(
+                        p.customer_number,
+                        ''
+                    ) AS customer_number,
+
+                    p.id AS sort_id
+
+                FROM payments p
+
+                WHERE
+                    p.customer_name LIKE %s
+
+                    OR
+
+                    COALESCE(
+                        p.customer_number,
+                        ''
+                    ) LIKE %s
+
+
+                UNION ALL
+
+
+                /* =====================================================
+                   3. LATER CREDIT PAYMENTS
+                   ===================================================== */
+
+                SELECT
+
+                    cp.sale_date AS transaction_date,
+
+                    'Payment' AS transaction_type,
+
+                    CONCAT(
+                        'Credit payment - ',
+                        cp.product_name
+                    ) AS description,
+
+                    0 AS debit_amount,
+
+                    COALESCE(
+                        cp.total_amount,
+                        0
+                    ) AS credit_amount,
+
+                    cp.customer_name,
+
+                    COALESCE(
+                        cp.customer_number,
+                        ''
+                    ) AS customer_number,
+
+                    cp.id AS sort_id
+
+                FROM sales cp
+
+                WHERE cp.sale_type = 'Credit Payment'
+
+                  AND (
+                      cp.customer_name LIKE %s
+
+                      OR
+
+                      COALESCE(
+                          cp.customer_number,
+                          ''
+                      ) LIKE %s
+                  )
+
+
+                UNION ALL
+
+
+                /* =====================================================
+                   4. DELIVERED REPAIR
+                   ===================================================== */
+
+                SELECT
+
+                    /* One repair = one customer charge.
+                       The advance entered when the phone is received
+                       is NOT shown before delivery.
+
+                       Example:
+                       Repair amount = ₹2,000
+                       Advance      = ₹1,000
+                       Balance paid at delivery = ₹1,000
+
+                       After delivery:
+                       Debit  = ₹2,000
+                       Credit = ₹2,000
+                       Outstanding = ₹0
+
+                       The Repair row in SALES is excluded above, so
+                       this repair is not counted twice.
+                    */
+
+                    COALESCE(
+                        r.delivery_date,
+                        DATE(r.delivered_at),
+                        r.repair_date
+                    ) AS transaction_date,
+
+                    'Repair' AS transaction_type,
+
+                    CONCAT(
+                        'Repair - ',
+                        r.product_name,
+
+                        CASE
+                            WHEN COALESCE(
+                                r.model,
+                                ''
+                            ) <> ''
+
+                            THEN CONCAT(
+                                ' ',
+                                r.model
+                            )
+
+                            ELSE ''
+                        END
+                    ) AS description,
+
+                    COALESCE(
+                        r.amount,
+                        0
+                    ) AS debit_amount,
+
+                    COALESCE(
+                        r.advance,
+                        0
+                    ) AS credit_amount,
+
+                    r.customer_name,
+
+                    COALESCE(
+                        r.customer_number,
+                        ''
+                    ) AS customer_number,
+
+                    r.id AS sort_id
+
+                FROM repairs r
+
+                WHERE r.status = 'Delivered to Customer'
+
+                  AND (
+                      r.customer_name LIKE %s
+
+                      OR
+
+                      COALESCE(
+                          r.customer_number,
+                          ''
+                      ) LIKE %s
+                  )
+
+            ) ledger
+
+            ORDER BY
+                transaction_date ASC,
+                sort_id ASC
+
+        """, (
+            like,
+            like,
+
+            like,
+            like,
+
+            like,
+            like,
+
+            like,
+            like
+        ))
+
+        rows = cur.fetchall()
+
+        balance = 0.0
+        total_debit = 0.0
+        total_credit = 0.0
+
+        for row in rows:
+
+            # ---------------------------------------------------------
+            # DATE
+            # ---------------------------------------------------------
+
+            if row.get("transaction_date"):
+                row["transaction_date"] = (
+                    row["transaction_date"].isoformat()
+                )
+
+            # ---------------------------------------------------------
+            # AMOUNTS
+            # ---------------------------------------------------------
+
+            row["debit_amount"] = to_float(
+                row.get("debit_amount")
+            )
+
+            row["credit_amount"] = to_float(
+                row.get("credit_amount")
+            )
+
+            # ---------------------------------------------------------
+            # TOTALS
+            # ---------------------------------------------------------
+
+            total_debit += row["debit_amount"]
+
+            total_credit += row["credit_amount"]
+
+            # ---------------------------------------------------------
+            # RUNNING BALANCE
+            # ---------------------------------------------------------
+
+            balance += (
+                row["debit_amount"]
+                -
+                row["credit_amount"]
+            )
+
+            row["running_balance"] = round(
+                balance,
+                2
+            )
+
+        # -------------------------------------------------------------
+        # CUSTOMER DETAILS
+        # -------------------------------------------------------------
+
+        customer_name = ""
+        customer_number = ""
+
+        for row in rows:
+
+            if row.get("customer_name"):
+                customer_name = row["customer_name"]
+
+            if row.get("customer_number"):
+                customer_number = row["customer_number"]
+
+            if customer_name and customer_number:
+                break
+
+        # -------------------------------------------------------------
+        # RESPONSE
+        # -------------------------------------------------------------
+
+        return jsonify({
+
+            "customer_name":
+                customer_name or search,
+
+            "customer_number":
+                customer_number,
+
+            "total_debit":
+                round(
+                    total_debit,
+                    2
+                ),
+
+            "total_credit":
+                round(
+                    total_credit,
+                    2
+                ),
+
+            "outstanding":
+                round(
+                    balance,
+                    2
+                ),
+
+            "transactions":
+                rows
+        })
+
+    except Exception as e:
+
+        print(
+            "CUSTOMER LEDGER ERROR:",
+            e
+        )
+
+        traceback.print_exc()
+
+        return jsonify({
+            "error": str(e)
+        }), 500
+
+    finally:
+
+        if cur:
+            cur.close()
+
+        if conn:
+            conn.close()
+
+# ===============================================================
+# CUSTOMER NUMBER LOOKUP
+# ===============================================================
+
+@app.route("/api/customer-by-number", methods=["GET"])
+def customer_by_number():
+    """Find an existing customer name using the mobile number."""
+    customer_number = str(
+        request.args.get("number") or ""
+    ).strip()
+
+    if not customer_number:
+        return jsonify({
+            "exists": False,
+            "customer_name": "",
+            "customer_number": ""
+        })
+
+    conn = None
+    cur = None
+
+    try:
+        conn = get_conn()
+        cur = dict_cursor(conn)
+
+        # Prefer the most recent known customer name for this number.
+        cur.execute("""
+            SELECT customer_name, customer_number
+            FROM (
+                SELECT
+                    customer_name,
+                    customer_number,
+                    sale_date AS transaction_date,
+                    id AS sort_id
+                FROM sales
+                WHERE customer_number = %s
+                  AND customer_name IS NOT NULL
+                  AND TRIM(customer_name) <> ''
+
+                UNION ALL
+
+                SELECT
+                    customer_name,
+                    customer_number,
+                    payment_date AS transaction_date,
+                    id AS sort_id
+                FROM payments
+                WHERE customer_number = %s
+                  AND customer_name IS NOT NULL
+                  AND TRIM(customer_name) <> ''
+
+                UNION ALL
+
+                SELECT
+                    customer_name,
+                    customer_number,
+                    repair_date AS transaction_date,
+                    id AS sort_id
+                FROM repairs
+                WHERE customer_number = %s
+                  AND customer_name IS NOT NULL
+                  AND TRIM(customer_name) <> ''
+            ) customer_history
+            ORDER BY transaction_date DESC, sort_id DESC
+            LIMIT 1
+        """, (
+            customer_number,
+            customer_number,
+            customer_number
+        ))
+
+        row = cur.fetchone()
+
+        if not row:
+            return jsonify({
+                "exists": False,
+                "customer_name": "",
+                "customer_number": customer_number
+            })
+
+        return jsonify({
+            "exists": True,
+            "customer_name": row.get("customer_name") or "",
+            "customer_number": row.get("customer_number") or customer_number
+        })
+
+    except Exception as e:
+        print("CUSTOMER NUMBER LOOKUP ERROR:", e)
+        return jsonify({"error": str(e)}), 500
+
+    finally:
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
+
+
+# ===============================================================
 # PAGE
 # ===============================================================
 
@@ -841,6 +1541,8 @@ def get_sales():
             SELECT
                 s.id,
                 s.sale_date,
+                s.customer_name,
+                s.customer_number,
                 s.product_name,
                 s.quantity,
                 s.amount,
@@ -933,6 +1635,7 @@ def add_sale():
     sale_date = data.get("sale_date") or date.today().isoformat()
     product_name = str(data.get("product_name") or "").strip()
     customer_name = str(data.get("customer_name") or "").strip()
+    customer_number = str(data.get("customer_number") or "").strip()
     payment_type = str(data.get("payment_type") or "Full Payment").strip()
 
     try:
@@ -1016,6 +1719,7 @@ def add_sale():
                 (
                     payment_date,
                     customer_name,
+                    customer_number,
                     reference_name,
                     total_amount,
                     paid_amount,
@@ -1024,10 +1728,11 @@ def add_sale():
                     status,
                     notes
                 )
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
             """, (
                 sale_date,
                 customer_name,
+                customer_number,
                 product_name,
                 total_amount,
                 paid_amount,
@@ -1041,26 +1746,32 @@ def add_sale():
         # Only the money actually received today is recorded in Sales.
         if paid_amount > 0:
             cur.execute("""
-                INSERT INTO sales
-                (
-                    sale_date,
-                    product_name,
-                    quantity,
-                    amount,
-                    split_amount,
-                    total_amount,
-                    sale_type,
-                    payment_id
-                )
-                VALUES (%s,%s,%s,%s,0,%s,'Product',%s)
-            """, (
-                sale_date,
-                product_name,
-                quantity if payment_type == "Full Payment" else 0,
-                paid_amount,
-                paid_amount,
-                payment_id
-            ))
+    INSERT INTO sales
+    (
+        sale_date,
+        customer_name,
+        customer_number,
+        product_name,
+        quantity,
+        amount,
+        split_amount,
+        total_amount,
+        sale_type,
+        payment_id
+    )
+    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+""", (
+    sale_date,
+    customer_name,
+    customer_number,
+    product_name,
+    quantity if payment_type == "Full Payment" else 0,
+    paid_amount,
+    0,
+    paid_amount,
+    "Product",
+    payment_id
+))
             sale_id = cur.lastrowid
 
         # Stock is reduced once, when the item is sold, regardless of payment status.
@@ -1092,6 +1803,7 @@ def add_sale():
     except Exception as e:
         if conn:
             conn.rollback()
+            traceback.print_exc()
         return jsonify({"error": str(e)}), 500
     finally:
         if cur:
@@ -3272,6 +3984,8 @@ def update_repair_status(repair_id):
                     INSERT INTO sales
                     (
                         sale_date,
+                        customer_name,
+                        customer_number,
                         product_name,
                         quantity,
                         amount,
@@ -3284,6 +3998,8 @@ def update_repair_status(repair_id):
                     (
                         %s,
                         %s,
+                        %s,
+                        %s,
                         1,
                         %s,
                         0,
@@ -3294,6 +4010,8 @@ def update_repair_status(repair_id):
                     """,
                     (
                         delivery_date,
+                        repair["customer_name"],
+                        repair["customer_number"],
                         repair["product_name"],
                         received_amount,
                         received_amount,
@@ -3806,6 +4524,11 @@ def add_payment():
             or ""
         ).strip()
 
+        customer_number = (
+            data.get("customer_number")
+            or ""
+        ).strip()
+
         reference_name = (
             data.get("reference_name")
             or ""
@@ -3909,6 +4632,7 @@ def add_payment():
                 (
                     payment_date,
                     customer_name,
+                    customer_number,
                     reference_name,
                     total_amount,
                     paid_amount,
@@ -3927,12 +4651,14 @@ def add_payment():
                     %s,
                     %s,
                     %s,
+                    %s,
                     %s
                 )
                 """,
                 (
                     payment_date,
                     customer_name,
+                    customer_number,
                     reference_name,
                     total_amount,
                     paid_amount,
@@ -3986,6 +4712,7 @@ def update_payment(payment_id):
 
     payment_date = data.get("payment_date") or date.today().isoformat()
     customer_name = str(data.get("customer_name") or "").strip()
+    customer_number = str(data.get("customer_number") or "").strip()
     reference_name = str(data.get("reference_name") or "").strip()
     payment_method = data.get("payment_method") or "Cash"
     notes = str(data.get("notes") or "").strip()
@@ -4053,6 +4780,8 @@ def update_payment(payment_id):
                 INSERT INTO sales
                 (
                     sale_date,
+                    customer_name,
+                    customer_number,
                     product_name,
                     quantity,
                     amount,
@@ -4061,9 +4790,11 @@ def update_payment(payment_id):
                     sale_type,
                     payment_id
                 )
-                VALUES (%s,%s,0,%s,0,%s,'Credit Payment',%s)
+                VALUES (%s,%s,%s,%s,0,%s,0,%s,'Credit Payment',%s)
             """, (
                 payment_date,
+                customer_name,
+                payment.get("customer_number") or "",
                 reference_name,
                 additional_payment,
                 additional_payment,
@@ -4076,6 +4807,7 @@ def update_payment(payment_id):
             SET
                 payment_date=%s,
                 customer_name=%s,
+                customer_number=%s,
                 reference_name=%s,
                 paid_amount=%s,
                 balance_amount=%s,
@@ -4086,6 +4818,7 @@ def update_payment(payment_id):
         """, (
             payment_date,
             customer_name,
+            customer_number,
             reference_name,
             new_paid,
             new_balance,
@@ -6015,6 +6748,8 @@ def add_recharge():
             INSERT INTO sales
             (
                 sale_date,
+                customer_name,
+                customer_number,
                 product_name,
                 quantity,
                 amount,
@@ -6029,6 +6764,8 @@ def add_recharge():
             (
                 %s,
                 %s,
+                %s,
+                %s,
                 1,
                 %s,
                 0,
@@ -6040,6 +6777,8 @@ def add_recharge():
             )
         """, (
             sale_date,
+            customer_name,
+            mobile_number,
             f"{operator} Recharge",
             amount,
             amount,

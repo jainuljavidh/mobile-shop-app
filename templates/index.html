@@ -232,6 +232,81 @@
     margin-right: 6px;
 }
 </style>
+
+<style>
+.customer-ledger-search {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px;
+    margin-bottom: 18px;
+}
+.customer-ledger-search input {
+    min-width: 0;
+}
+.customer-ledger-search button {
+    white-space: nowrap;
+}
+.customer-ledger-empty {
+    padding: 18px;
+    border-radius: 12px;
+    background: rgba(0, 0, 0, 0.035);
+    color: #6b7280;
+}
+.customer-ledger-profile {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 18px;
+}
+.customer-ledger-profile > div {
+    padding: 14px;
+    border: 1px solid rgba(0,0,0,.08);
+    border-radius: 12px;
+    background: #fff;
+}
+.customer-ledger-profile span {
+    display: block;
+    font-size: 12px;
+    opacity: .7;
+    margin-bottom: 5px;
+}
+.customer-ledger-profile strong {
+    display: block;
+    font-size: 17px;
+    word-break: break-word;
+}
+.customer-ledger-table-wrap {
+    overflow-x: auto;
+}
+.customer-ledger-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+.customer-ledger-table th,
+.customer-ledger-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid rgba(0,0,0,.08);
+    text-align: left;
+    vertical-align: middle;
+}
+.customer-ledger-table .ledger-balance {
+    font-weight: 700;
+}
+@media (max-width: 900px) {
+    .customer-ledger-profile {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+@media (max-width: 640px) {
+    .customer-ledger-search {
+        grid-template-columns: 1fr;
+    }
+    .customer-ledger-profile {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+
 </head>
 
 
@@ -352,7 +427,7 @@
         </div>
         <!-- SECTION NAVIGATION -->
 
-<nav class="section-nav" id="sectionNavigation" aria-label="Shop sections">
+<!-- <nav class="section-nav" id="sectionNavigation" aria-label="Shop sections">
 
     <button type="button" class="section-nav-btn active" data-section="dashboardSection">
         Dashboard
@@ -390,12 +465,76 @@
         User Management
     </button>
 
+    <button type="button" class="section-nav-btn" data-section="customerLedgerSection">
+        Customer Ledger
+    </button>
+
     <button type="button" class="section-nav-btn" data-section="paymentsSection">
         Payment Tracking
     </button>
 
-</nav>
+</nav> -->
 
+<nav class="section-nav" id="sectionNavigation" aria-label="Shop sections">
+
+    <button type="button" class="section-nav-btn active" data-section="dashboardSection">
+        <span class="nav-icon">📊</span>
+        <span class="nav-label">Dashboard</span>
+    </button>
+
+    
+
+    <button type="button" class="section-nav-btn" data-section="salesSection">
+        <span class="nav-icon">🛒</span>
+        <span class="nav-label">Sales</span>
+    </button>
+
+    <button type="button" class="section-nav-btn" data-section="purchasesSection">
+        <span class="nav-icon">📦</span>
+        <span class="nav-label">Purchases</span>
+    </button>
+
+    <button type="button" class="section-nav-btn" data-section="inventorySection">
+        <span class="nav-icon">📋</span>
+        <span class="nav-label">Inventory</span>
+    </button>
+
+    <button type="button" class="section-nav-btn" data-section="expensesSection">
+        <span class="nav-icon">💰</span>
+        <span class="nav-label">Expenses</span>
+    </button>
+
+    <button type="button" class="section-nav-btn" data-section="enquiriesSection">
+        <span class="nav-icon">👥</span>
+        <span class="nav-label">Enquiries</span>
+    </button>
+
+    <button type="button" class="section-nav-btn" data-section="repairsSection">
+        <span class="nav-icon">🔧</span>
+        <span class="nav-label">Repairs</span>
+    </button>
+
+    
+
+    <button type="button" class="section-nav-btn" data-section="customerLedgerSection">
+        <span class="nav-icon">📒</span>
+        <span class="nav-label">Ledger</span>
+    </button>
+
+    <button type="button" class="section-nav-btn" data-section="paymentsSection">
+        <span class="nav-icon">💳</span>
+        <span class="nav-label">Payments</span>
+    </button>
+    <button type="button" class="section-nav-btn" data-section="masterSection">
+        <span class="nav-icon">🧩</span>
+        <span class="nav-label">Master</span>
+    </button>
+    <button type="button" class="section-nav-btn" data-section="userManagementSection">
+        <span class="nav-icon">👤</span>
+        <span class="nav-label">Users</span>
+    </button>
+
+</nav>
     </header>
 
 
@@ -609,140 +748,7 @@
 
 </section>
     
-
-
-
-
-
-
-
-
-
-        <!-- =================================================
-             MASTER DATA
-        ================================================== -->
-
-        <section
-            id="masterSection"
-            class="ledger-card accent-inventory"
-            aria-label="Master data"
-        >
-
-            <div class="ledger-head">
-
-                <h2>Master</h2>
-
-                <p class="ledger-sub">
-                    Create categories, models and part / item names for Inventory dropdowns
-                </p>
-
-            </div>
-
-            <div class="master-help">
-                <strong>How it works:</strong>
-                Create a Category first. Then create Models under that Category.
-                Finally create Part / Items under a Model. These master values will
-                automatically appear in the Inventory dropdowns.
-            </div>
-
-            <div class="master-grid">
-
-                <!-- CATEGORY MASTER -->
-                <div class="master-panel">
-                    <h3>Categories</h3>
-                    <p>Example: Mobile, Accessories</p>
-
-                    <form class="master-form" id="masterCategoryForm">
-                        <input
-                            type="text"
-                            id="masterCategoryName"
-                            placeholder="Category name"
-                            maxlength="50"
-                            required
-                            autocomplete="off"
-                        >
-
-                        <button type="submit">
-                            Add Category
-                        </button>
-                    </form>
-                </div>
-
-                <!-- MODEL MASTER -->
-                <div class="master-panel">
-                    <h3>Models</h3>
-                    <p>Example: iPhone 17, iPhone 16, 6A</p>
-
-                    <form class="master-form" id="masterModelForm">
-                        <select id="masterModelCategory" required>
-                            <option value="">Select Category</option>
-                        </select>
-
-                        <input
-                            type="text"
-                            id="masterModelName"
-                            placeholder="Model name"
-                            maxlength="100"
-                            required
-                            autocomplete="off"
-                        >
-
-                        <button type="submit">
-                            Add Model
-                        </button>
-                    </form>
-                </div>
-
-                <!-- PART / ITEM MASTER -->
-                <div class="master-panel">
-                    <h3>Part / Items</h3>
-                    <p>Example: Display, Tempered Glass, Back Case</p>
-
-                    <form class="master-form" id="masterPartForm">
-                        <select id="masterPartCategory" required>
-                            <option value="">Select Category</option>
-                        </select>
-
-                        <select id="masterPartModel" required disabled>
-                            <option value="">Select Model</option>
-                        </select>
-
-                        <input
-                            type="text"
-                            id="masterPartName"
-                            placeholder="Part / Item name"
-                            maxlength="100"
-                            required
-                            autocomplete="off"
-                        >
-
-                        <button type="submit">
-                            Add Part / Item
-                        </button>
-                    </form>
-                </div>
-
-            </div>
-
-            <!-- MASTER TABLE -->
-            <div class="master-table-wrap">
-                <table class="master-table">
-                    <thead>
-                        <tr>
-                            <th>Category</th>
-                            <th>Models</th>
-                            <th>Part / Items</th>
-                        </tr>
-                    </thead>
-                    <tbody id="masterDataBody">
-                    </tbody>
-                </table>
-            </div>
-
-        </section>
-
-
-        <!-- =================================================
+ <!-- =================================================
              SALES
         ================================================== -->
 
@@ -759,6 +765,13 @@
         type="text"
         name="customer_name"
         placeholder="Customer name (required for credit / partial)"
+    >
+
+    <input
+        type="text"
+        name="customer_number"
+        placeholder="Customer mobile number (optional)"
+        maxlength="30"
     >
 
     <input
@@ -1017,6 +1030,79 @@
      PAYMENTS
 ================================================== -->
 
+<!-- =================================================
+     CUSTOMER LEDGER
+================================================== -->
+
+<section
+    id="customerLedgerSection"
+    class="ledger-card accent-payments customer-ledger-section"
+    aria-label="Customer ledger"
+>
+
+    <div class="ledger-head">
+        <h2>Customer Ledger</h2>
+        <p class="ledger-sub">Search a customer by mobile number or name and view sales, payments and repairs.</p>
+    </div>
+
+    <div class="customer-ledger-search">
+        <input
+            type="text"
+            id="customerLedgerSearch"
+            placeholder="Enter customer mobile number or name"
+            autocomplete="off"
+        >
+        <button type="button" id="customerLedgerSearchBtn">Search Customer</button>
+    </div>
+
+    <div id="customerLedgerEmpty" class="customer-ledger-empty">
+        Search for a customer to view the ledger.
+    </div>
+
+    <div id="customerLedgerResult" style="display:none;">
+        <div class="customer-ledger-profile">
+            <div>
+                <span>Customer</span>
+                <strong id="ledgerCustomerName">-</strong>
+            </div>
+            <div>
+                <span>Mobile Number</span>
+                <strong id="ledgerCustomerNumber">-</strong>
+            </div>
+            <div>
+                <span>Total Sales / Charges</span>
+                <strong id="ledgerTotalDebit">₹0</strong>
+            </div>
+            <div>
+                <span>Total Paid</span>
+                <strong id="ledgerTotalCredit">₹0</strong>
+            </div>
+            <div>
+                <span>Outstanding</span>
+                <strong id="ledgerOutstanding">₹0</strong>
+            </div>
+        </div>
+
+        <div class="customer-ledger-table-wrap">
+            <table class="customer-ledger-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Type</th>
+                        <th>Description</th>
+                        <th>Debit</th>
+                        <th>Credit</th>
+                        <th>Balance</th>
+                    </tr>
+                </thead>
+                <tbody id="customerLedgerBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+</section>
+
+
 <section
     id="paymentsSection"
     class="ledger-card accent-payments"
@@ -1048,6 +1134,13 @@
             name="customer_name"
             placeholder="Customer name"
             required
+        >
+
+        <input
+            type="text"
+            name="customer_number"
+            placeholder="Customer mobile number (optional)"
+            maxlength="30"
         >
 
         <input
@@ -2053,6 +2146,129 @@
     </div>
 
 </section>
+
+ <!-- =================================================
+             MASTER DATA
+        ================================================== -->
+
+<section
+            id="masterSection"
+            class="ledger-card accent-inventory"
+            aria-label="Master data"
+        >
+
+            <div class="ledger-head">
+
+                <h2>Master</h2>
+
+                <p class="ledger-sub">
+                    Create categories, models and part / item names for Inventory dropdowns
+                </p>
+
+            </div>
+
+            <div class="master-help">
+                <strong>How it works:</strong>
+                Create a Category first. Then create Models under that Category.
+                Finally create Part / Items under a Model. These master values will
+                automatically appear in the Inventory dropdowns.
+            </div>
+
+            <div class="master-grid">
+
+                <!-- CATEGORY MASTER -->
+                <div class="master-panel">
+                    <h3>Categories</h3>
+                    <p>Example: Mobile, Accessories</p>
+
+                    <form class="master-form" id="masterCategoryForm">
+                        <input
+                            type="text"
+                            id="masterCategoryName"
+                            placeholder="Category name"
+                            maxlength="50"
+                            required
+                            autocomplete="off"
+                        >
+
+                        <button type="submit">
+                            Add Category
+                        </button>
+                    </form>
+                </div>
+
+                <!-- MODEL MASTER -->
+                <div class="master-panel">
+                    <h3>Models</h3>
+                    <p>Example: iPhone 17, iPhone 16, 6A</p>
+
+                    <form class="master-form" id="masterModelForm">
+                        <select id="masterModelCategory" required>
+                            <option value="">Select Category</option>
+                        </select>
+
+                        <input
+                            type="text"
+                            id="masterModelName"
+                            placeholder="Model name"
+                            maxlength="100"
+                            required
+                            autocomplete="off"
+                        >
+
+                        <button type="submit">
+                            Add Model
+                        </button>
+                    </form>
+                </div>
+
+                <!-- PART / ITEM MASTER -->
+                <div class="master-panel">
+                    <h3>Part / Items</h3>
+                    <p>Example: Display, Tempered Glass, Back Case</p>
+
+                    <form class="master-form" id="masterPartForm">
+                        <select id="masterPartCategory" required>
+                            <option value="">Select Category</option>
+                        </select>
+
+                        <select id="masterPartModel" required disabled>
+                            <option value="">Select Model</option>
+                        </select>
+
+                        <input
+                            type="text"
+                            id="masterPartName"
+                            placeholder="Part / Item name"
+                            maxlength="100"
+                            required
+                            autocomplete="off"
+                        >
+
+                        <button type="submit">
+                            Add Part / Item
+                        </button>
+                    </form>
+                </div>
+
+            </div>
+
+            <!-- MASTER TABLE -->
+            <div class="master-table-wrap">
+                <table class="master-table">
+                    <thead>
+                        <tr>
+                            <th>Category</th>
+                            <th>Models</th>
+                            <th>Part / Items</th>
+                        </tr>
+                    </thead>
+                    <tbody id="masterDataBody">
+                    </tbody>
+                </table>
+            </div>
+
+        </section>
 
 
         <!-- =================================================

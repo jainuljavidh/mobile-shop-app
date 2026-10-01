@@ -988,6 +988,71 @@ if (repairPartItem) {
 }
 
 
+// ============================================================
+// CUSTOMER NUMBER LOOKUP
+// ============================================================
+
+async function checkExistingCustomerNumber(form) {
+    const numberInput = form.elements['customer_number'];
+    const nameInput = form.elements['customer_name'];
+
+    if (!numberInput || !nameInput) {
+        return true;
+    }
+
+    const customerNumber = numberInput.value.trim();
+    const customerName = nameInput.value.trim();
+
+    if (!customerNumber) {
+        return true;
+    }
+
+    try {
+        const customer = await api(
+            `/api/customer-by-number?number=${encodeURIComponent(customerNumber)}`
+        );
+
+        if (!customer.exists) {
+            return true;
+        }
+
+        const existingName = String(
+            customer.customer_name || ''
+        ).trim();
+
+        if (
+            existingName &&
+            customerName &&
+            existingName.toLowerCase() !== customerName.toLowerCase()
+        ) {
+            const useExisting = confirm(
+                `This mobile number already belongs to "${existingName}".\n\n` +
+                `You entered "${customerName}".\n\n` +
+                `Click OK to use "${existingName}" or Cancel to review the name.`
+            );
+
+            if (useExisting) {
+                nameInput.value = existingName;
+                return true;
+            }
+
+            nameInput.focus();
+            return false;
+        }
+
+        if (!customerName && existingName) {
+            nameInput.value = existingName;
+        }
+
+        return true;
+
+    } catch (err) {
+        console.error('Customer number lookup error:', err);
+        return true;
+    }
+}
+
+
 if (salesForm) {
 
     salesForm.addEventListener(
@@ -1007,9 +1072,17 @@ if (salesForm) {
             const productName =
                 productInput.value.trim() || selectedPartItem;
 
+            const customerNameInput = f.elements['customer_name'];
+            const customerNumberInput = f.elements['customer_number'];
+
             const customerName =
-                f.elements['customer_name']
-                    ? f.elements['customer_name'].value.trim()
+                customerNameInput
+                    ? customerNameInput.value.trim()
+                    : '';
+
+            const customerNumber =
+                customerNumberInput
+                    ? customerNumberInput.value.trim()
                     : '';
 
             const quantity = Number(f.elements['quantity'].value);
@@ -1051,6 +1124,15 @@ if (salesForm) {
                 return;
             }
 
+            if (customerNumber) {
+                const customerNumberOk =
+                    await checkExistingCustomerNumber(f);
+
+                if (!customerNumberOk) {
+                    return;
+                }
+            }
+
             if (paymentType === 'Partial Payment') {
                 if (!Number.isFinite(paidAmount) || paidAmount <= 0 || paidAmount >= amount) {
                     toast('Partial paid amount must be less than the total amount', true);
@@ -1085,6 +1167,12 @@ if (salesForm) {
             const payload = {
                 sale_date: state.date,
                 customer_name: customerName,
+                
+                customer_number:
+                    f.elements['customer_number']
+                        ? f.elements['customer_number'].value.trim()
+                        : '',
+customer_number: customerNumber,
                 product_name: productName,
                 quantity: quantity,
                 amount: amount,
@@ -5534,6 +5622,58 @@ async function editPayment(payment) {
 // PAYMENT TRACKING - ADD
 // ============================================================
 
+async function checkExistingPaymentCustomerNumber(form) {
+    const numberInput = form.elements['customer_number'];
+    const nameInput = form.elements['customer_name'];
+
+    if (!numberInput || !nameInput) return true;
+
+    const customerNumber = numberInput.value.trim();
+    const customerName = nameInput.value.trim();
+
+    if (!customerNumber) return true;
+
+    try {
+        const customer = await api(
+            `/api/customer-by-number?number=${encodeURIComponent(customerNumber)}`
+        );
+
+        if (!customer.exists) return true;
+
+        const existingName = String(customer.customer_name || '').trim();
+
+        if (
+            existingName &&
+            customerName &&
+            existingName.toLowerCase() !== customerName.toLowerCase()
+        ) {
+            const useExisting = confirm(
+                `This mobile number already belongs to "${existingName}".\n\n` +
+                `You entered "${customerName}".\n\n` +
+                `Click OK to use "${existingName}" or Cancel to review the name.`
+            );
+
+            if (useExisting) {
+                nameInput.value = existingName;
+                return true;
+            }
+
+            nameInput.focus();
+            return false;
+        }
+
+        if (!customerName && existingName) {
+            nameInput.value = existingName;
+        }
+
+        return true;
+    } catch (err) {
+        console.error('Payment customer lookup error:', err);
+        return true;
+    }
+}
+
+
 if (paymentsForm) {
 
     paymentsForm.addEventListener(
@@ -6922,6 +7062,158 @@ async function deleteRecharge(saleId) {
             "error"
         );
     }
+}
+
+
+// ============================================================
+// CUSTOMER LEDGER SEARCH
+// ============================================================
+
+const customerLedgerSearchInput =
+    document.getElementById('customerLedgerSearch');
+
+const customerLedgerSearchBtn =
+    document.getElementById('customerLedgerSearchBtn');
+
+const customerLedgerEmpty =
+    document.getElementById('customerLedgerEmpty');
+
+const customerLedgerResult =
+    document.getElementById('customerLedgerResult');
+
+
+function renderCustomerLedger(data) {
+
+    if (!data) {
+        return;
+    }
+
+    const nameEl = document.getElementById('ledgerCustomerName');
+    const numberEl = document.getElementById('ledgerCustomerNumber');
+    const debitEl = document.getElementById('ledgerTotalDebit');
+    const creditEl = document.getElementById('ledgerTotalCredit');
+    const outstandingEl = document.getElementById('ledgerOutstanding');
+    const bodyEl = document.getElementById('customerLedgerBody');
+
+    if (nameEl) nameEl.textContent = data.customer_name || '-';
+    if (numberEl) numberEl.textContent = data.customer_number || '-';
+    if (debitEl) debitEl.textContent = fmt(data.total_debit);
+    if (creditEl) creditEl.textContent = fmt(data.total_credit);
+    if (outstandingEl) outstandingEl.textContent = fmt(data.outstanding);
+
+    if (bodyEl) {
+        const transactions = Array.isArray(data.transactions)
+            ? data.transactions
+            : [];
+
+        if (!transactions.length) {
+            bodyEl.innerHTML = `
+                <tr>
+                    <td colspan="6" style="text-align:center;padding:18px;">
+                        No transactions found for this customer.
+                    </td>
+                </tr>
+            `;
+        } else {
+            bodyEl.innerHTML = transactions.map(row => `
+                <tr>
+                    <td>${escapeHtml(row.transaction_date || '-')}</td>
+                    <td>${escapeHtml(row.transaction_type || '-')}</td>
+                    <td>${escapeHtml(row.description || '-')}</td>
+                    <td>${fmt(row.debit_amount)}</td>
+                    <td>${fmt(row.credit_amount)}</td>
+                    <td class="ledger-balance">${fmt(row.running_balance)}</td>
+                </tr>
+            `).join('');
+        }
+    }
+
+    if (customerLedgerEmpty) {
+        customerLedgerEmpty.style.display = 'none';
+    }
+
+    if (customerLedgerResult) {
+        customerLedgerResult.style.display = 'block';
+    }
+}
+
+
+async function searchCustomerLedger() {
+
+    if (!customerLedgerSearchInput) {
+        return;
+    }
+
+    const query = customerLedgerSearchInput.value.trim();
+
+    if (!query) {
+        if (customerLedgerResult) {
+            customerLedgerResult.style.display = 'none';
+        }
+        if (customerLedgerEmpty) {
+            customerLedgerEmpty.style.display = 'block';
+            customerLedgerEmpty.textContent =
+                'Enter a customer mobile number or name.';
+        }
+        return;
+    }
+
+    if (customerLedgerSearchBtn) {
+        customerLedgerSearchBtn.disabled = true;
+        customerLedgerSearchBtn.textContent = 'Searching...';
+    }
+
+    try {
+        const data = await api(
+            `/api/customer-ledger?q=${encodeURIComponent(query)}`
+        );
+
+        renderCustomerLedger(data);
+
+    } catch (error) {
+        console.error('CUSTOMER LEDGER SEARCH ERROR:', error);
+
+        if (customerLedgerResult) {
+            customerLedgerResult.style.display = 'none';
+        }
+
+        if (customerLedgerEmpty) {
+            customerLedgerEmpty.style.display = 'block';
+            customerLedgerEmpty.textContent =
+                error.message || 'Customer ledger search failed.';
+        }
+
+        toast(
+            error.message || 'Customer ledger search failed',
+            true
+        );
+    } finally {
+        if (customerLedgerSearchBtn) {
+            customerLedgerSearchBtn.disabled = false;
+            customerLedgerSearchBtn.textContent = 'Search Customer';
+        }
+    }
+}
+
+
+if (customerLedgerSearchBtn) {
+    customerLedgerSearchBtn.addEventListener(
+        'click',
+        searchCustomerLedger
+    );
+}
+
+
+if (customerLedgerSearchInput) {
+    customerLedgerSearchInput.addEventListener(
+        'keydown',
+        function (event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                searchCustomerLedger();
+            }
+        }
+    );
 }
 
 

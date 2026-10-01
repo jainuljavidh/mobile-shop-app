@@ -250,45 +250,298 @@ main {
    Dashboard / Sales / Purchase / Inventory / etc.
 ========================================================= */
 
+
+/* ============================================================
+   COMPACT ICON NAVIGATION
+   ============================================================ */
+
 .section-nav {
-  width: 100%;
+    width: 100%;
+    max-width: 1040px;
+    margin: 0 auto 20px;
 
-  display: flex;
+    padding: 10px;
 
-  gap: 10px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
 
-  padding: 12px;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
 
-  margin: 0 0 20px 0;
+    position: sticky;
+    top: 0;
+    z-index: 1500;
 
-  background: #ffffff;
+    overflow: hidden;
 
-  border: 1px solid #e5e7eb;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
 
-  border-radius: 12px;
+.section-nav-btn {
+    width: 48px;
+    height: 44px;
 
-  position: sticky;
+    flex: 0 0 48px;
 
-  /*
-     Topbar is approximately 70px high.
-     Keep navigation below it.
-  */
-  top: 70px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 
-  z-index: 1000;
+    border: none;
+    border-radius: 9px;
 
-  overflow-x: auto;
+    background: #f3f4f6;
+    color: #374151;
 
-  scrollbar-width: thin;
+    font-size: 21px;
+    line-height: 1;
 
-  box-shadow:
-    0 2px 8px rgba(0, 0, 0, 0.08);
+    cursor: pointer;
+
+    transition:
+        background 0.2s ease,
+        transform 0.15s ease,
+        box-shadow 0.2s ease;
+}
+
+.section-nav-btn:hover {
+    background: #e5e7eb;
+    transform: translateY(-1px);
+}
+
+.section-nav-btn.active {
+    background: #111827;
+    color: #ffffff;
+
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15);
+}
+
+.section-nav-btn:active {
+    transform: scale(0.94);
 }
 
 
+/* ============================================================
+   MOBILE
+   ============================================================ */
+
+@media (max-width: 700px) {
+
+    .section-nav {
+        width: calc(100% - 20px);
+        margin: 0 auto 15px;
+
+        padding: 7px;
+
+        gap: 5px;
+
+        justify-content: space-between;
+
+        overflow: hidden;
+    }
+
+    .section-nav-btn {
+        width: 38px;
+        height: 38px;
+
+        flex: 1 1 0;
+
+        max-width: 44px;
+        min-width: 32px;
+
+        border-radius: 8px;
+
+        font-size: 17px;
+    }
+}
+
+
+/* Very small phones */
+
+@media (max-width: 400px) {
+
+    .section-nav {
+        gap: 3px;
+        padding: 5px;
+    }
+
+    .section-nav-btn {
+        height: 35px;
+        min-width: 28px;
+
+        font-size: 15px;
+    }
+}
+
+/* ============================================================
+   ICON + NAME NAVIGATION
+   ============================================================ */
+
+.section-nav {
+    width: 100%;
+    max-width: 1040px;
+    margin: 0 auto 20px;
+
+    padding: 8px;
+
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 6px;
+
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+
+    position: sticky;
+    top: 0;
+    z-index: 1500;
+
+    overflow: hidden;
+
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.section-nav-btn {
+    flex: 1 1 auto;
+
+    min-width: 0;
+    height: 42px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+
+    padding: 7px 9px;
+
+    border: none;
+    border-radius: 8px;
+
+    background: #f3f4f6;
+    color: #374151;
+
+    font-size: 12px;
+    font-weight: 600;
+
+    cursor: pointer;
+    white-space: nowrap;
+
+    transition: all 0.2s ease;
+}
+
+.nav-icon {
+    font-size: 17px;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+.nav-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.section-nav-btn:hover {
+    background: #e5e7eb;
+}
+
+.section-nav-btn.active {
+    background: #111827;
+    color: #ffffff;
+}
+
+
+/* ============================================================
+   TABLET / SMALL SCREEN
+   ============================================================ */
+
+@media (max-width: 900px) {
+
+    .section-nav {
+        gap: 4px;
+        padding: 6px;
+    }
+
+    .section-nav-btn {
+        height: 38px;
+        padding: 5px 6px;
+        font-size: 10px;
+        gap: 3px;
+    }
+
+    .nav-icon {
+        font-size: 15px;
+    }
+}
+
+
+/* ============================================================
+   MOBILE
+   ============================================================ */
+
+@media (max-width: 600px) {
+
+    /* .section-nav {
+        width: calc(100% - 12px);
+        margin: 0 auto 12px;
+
+        gap: 3px;
+        padding: 5px;
+    }
+
+    .section-nav-btn {
+        height: 36px;
+
+        padding: 4px;
+
+        flex-direction: column;
+        gap: 1px;
+
+        font-size: 8px;
+        line-height: 1;
+    }
+
+    .nav-icon {
+        font-size: 15px;
+    }
+
+    .nav-label {
+        max-width: 100%;
+    } */
+}
+.section-nav {
+    width: 100%;
+    max-width: 1040px;
+    margin: 0 auto 20px;
+
+    padding: 6px 0;
+
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 6px;
+
+    /* No background */
+    background: transparent;
+
+    /* No border */
+    border: none;
+
+    /* No box */
+    box-shadow: none;
+
+    position: sticky;
+    top: 0;
+    z-index: 1500;
+
+    overflow: hidden;
+}
 /* Navigation buttons */
 
-.section-nav button,
+/* .section-nav button,
 .section-nav-btn {
   flex: 0 0 auto;
 
@@ -313,25 +566,25 @@ main {
   transition:
     background 0.2s ease,
     color 0.2s ease;
-}
+} */
 
 
 /* Hover */
 
-.section-nav button:hover,
+/* .section-nav button:hover,
 .section-nav-btn:hover {
   background: #e5e7eb;
-}
+} */
 
 
 /* Active button */
 
-.section-nav button.active,
+/* .section-nav button.active,
 .section-nav-btn.active {
   background: #111827;
 
   color: #ffffff;
-}
+} */
 
 
 /* Mobile */
