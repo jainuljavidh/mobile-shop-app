@@ -1,6 +1,8 @@
 
 
 import os
+import io
+from decimal import Decimal
 from datetime import date, datetime, timedelta, timezone
 import traceback
 
@@ -11,7 +13,8 @@ from flask import (
     render_template,
     redirect,
     url_for,
-    session
+    session,
+    send_file
 )
 
 from werkzeug.security import (
@@ -408,6 +411,180 @@ def require_login():
 
 
 # ===============================================================
+# DATABASE BACKUP
+# ===============================================================
+
+
+def _sql_identifier(value):
+    """Safely quote a MySQL identifier such as a table name."""
+    return "`" + str(value).replace("`", "``") + "`"
+
+
+def _sql_value(value):
+    """Convert a MySQL value into a SQL literal."""
+
+    if value is None:
+        return "NULL"
+
+    if isinstance(value, bool):
+        return "1" if value else "0"
+
+    if isinstance(value, (int, float, Decimal)):
+        return str(value)
+
+    if isinstance(value, datetime):
+        return "'" + value.isoformat(sep=" ") + "'"
+
+    if isinstance(value, date):
+        return "'" + value.isoformat() + "'"
+
+    if isinstance(value, bytes):
+        return "X'" + value.hex() + "'"
+
+    text = str(value)
+    text = (
+        text.replace("\\", "\\\\")
+            .replace("'", "\\'")
+            .replace("\x00", "\\0")
+            .replace("\n", "\\n")
+            .replace("\r", "\\r")
+            .replace("\x1a", "\\Z")
+    )
+    return "'" + text + "'"
+
+
+def create_database_backup():
+    """
+    Create a complete SQL backup of the configured MySQL database.
+
+    This uses the MySQL connection already used by Shop Ledger instead
+    of relying on the external mysqldump command. That makes the same
+    backup endpoint usable for local MySQL and, later, Aiven MySQL.
+    """
+
+    database_name = DB_CONFIG["database"]
+    conn = None
+    cur = None
+
+    try:
+        conn = get_conn()
+        cur = conn.cursor()
+
+        cur.execute("SHOW TABLES")
+        table_rows = cur.fetchall()
+        tables = [row[0] for row in table_rows]
+
+        lines = [
+            "-- Shop Ledger Database Backup",
+            "-- Database: " + str(database_name),
+            "-- Created: " + datetime.now(IST).strftime("%Y-%m-%d %H:%M:%S"),
+            "",
+            "SET FOREIGN_KEY_CHECKS=0;",
+            "SET SQL_MODE='NO_AUTO_VALUE_ON_ZERO';",
+            "",
+            "CREATE DATABASE IF NOT EXISTS " + _sql_identifier(database_name) + ";",
+            "USE " + _sql_identifier(database_name) + ";",
+            "",
+        ]
+
+        for table_name in tables:
+            quoted_table = _sql_identifier(table_name)
+
+            cur.execute("SHOW CREATE TABLE " + quoted_table)
+            create_row = cur.fetchone()
+            create_sql = create_row[1]
+
+            lines.append("-- --------------------------------------------------")
+            lines.append("-- Table: " + table_name)
+            lines.append("-- --------------------------------------------------")
+            lines.append("DROP TABLE IF EXISTS " + quoted_table + ";")
+            lines.append(create_sql + ";")
+            lines.append("")
+
+            cur.execute("SELECT * FROM " + quoted_table)
+            rows = cur.fetchall()
+
+            if rows:
+                column_count = len(rows[0])
+                columns = [
+                    _sql_identifier(desc[0])
+                    for desc in cur.description
+                ]
+                column_sql = ", ".join(columns)
+
+                for start in range(0, len(rows), 500):
+                    batch = rows[start:start + 500]
+                    values_sql = []
+
+                    for row in batch:
+                        values_sql.append(
+                            "(" + ", ".join(
+                                _sql_value(value) for value in row
+                            ) + ")"
+                        )
+
+                    lines.append(
+                        "INSERT INTO " + quoted_table +
+                        " (" + column_sql + ") VALUES\n" +
+                        ",\n".join(values_sql) + ";"
+                    )
+
+                    lines.append("")
+
+        lines.extend([
+            "SET FOREIGN_KEY_CHECKS=1;",
+            "",
+            "-- End of Shop Ledger backup",
+        ])
+
+        return "\n".join(lines)
+
+    finally:
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
+
+
+@app.route("/api/database-backup", methods=["GET"])
+def database_backup():
+    """Create and download a Shop Ledger SQL backup."""
+
+    try:
+        sql_text = create_database_backup()
+
+        backup_dir = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            "backup"
+        )
+        os.makedirs(backup_dir, exist_ok=True)
+
+        timestamp = datetime.now(IST).strftime("%Y-%m-%d_%H-%M-%S")
+        filename = f"shop_ledger_backup_{timestamp}.sql"
+        backup_path = os.path.join(backup_dir, filename)
+
+        with open(backup_path, "w", encoding="utf-8", newline="\n") as backup_file:
+            backup_file.write(sql_text)
+
+        return send_file(
+            io.BytesIO(sql_text.encode("utf-8")),
+            mimetype="application/sql",
+            as_attachment=True,
+            download_name=filename
+        )
+
+    except Exception as e:
+        print("DATABASE BACKUP ERROR:", e)
+        traceback.print_exc()
+
+        return jsonify({
+            "error": "Unable to create database backup.",
+            "details": str(e)
+        }), 500
+
+
+
+# ===============================================================
 # USER MANAGEMENT
 # ===============================================================
 
@@ -800,9 +977,8 @@ def get_customer_ledger():
 
     IMPORTANT:
     - Product sales come from sales table.
-    - Credit sales remain visible from the original payments record
-      even after the balance is fully cleared.
-    - Later Credit Payment sales rows are shown separately as credits.
+    - Credit sales come from payments table when there is no
+      corresponding sales row.
     - Repair charge comes from repairs.amount only after the repair
       is Delivered to Customer.
     - repairs.advance is the cumulative total amount received for
@@ -826,128 +1002,7 @@ def get_customer_ledger():
         conn = get_conn()
         cur = dict_cursor(conn)
 
-        # -------------------------------------------------------------
-        # MOBILE NUMBER SEARCH
-        # -------------------------------------------------------------
-        # Mobile number is the customer's main identifier.
-        # First resolve the customer name from the mobile number.
-        # Then search the complete ledger by that customer name.
-        #
-        # This makes:
-        #   Search by NAME   -> complete customer ledger
-        #   Search by NUMBER -> the SAME complete customer ledger
-        #
-        # Older records may not have customer_number saved, so directly
-        # filtering every transaction by number can miss those records.
-        # -------------------------------------------------------------
-
-        search_is_number = (
-            any(ch.isdigit() for ch in search)
-            and not any(ch.isalpha() for ch in search)
-        )
-
-        ledger_search = search
-
-        if search_is_number:
-
-            normalized_number = (
-                search
-                .replace(" ", "")
-                .replace("-", "")
-                .replace("(", "")
-                .replace(")", "")
-            )
-
-            cur.execute(
-                """
-                SELECT customer_name
-                FROM (
-                    SELECT
-                        customer_name,
-                        customer_number,
-                        sale_date AS transaction_date,
-                        id AS sort_id
-                    FROM sales
-                    WHERE customer_number IS NOT NULL
-                      AND REPLACE(
-                            REPLACE(
-                                REPLACE(
-                                    REPLACE(customer_number, ' ', ''),
-                                    '-', ''
-                                ),
-                                '(',
-                                ''
-                            ),
-                            ')',
-                            ''
-                          ) = %s
-
-                    UNION ALL
-
-                    SELECT
-                        customer_name,
-                        customer_number,
-                        payment_date AS transaction_date,
-                        id AS sort_id
-                    FROM payments
-                    WHERE customer_number IS NOT NULL
-                      AND REPLACE(
-                            REPLACE(
-                                REPLACE(
-                                    REPLACE(customer_number, ' ', ''),
-                                    '-', ''
-                                ),
-                                '(',
-                                ''
-                            ),
-                            ')',
-                            ''
-                          ) = %s
-
-                    UNION ALL
-
-                    SELECT
-                        customer_name,
-                        customer_number,
-                        repair_date AS transaction_date,
-                        id AS sort_id
-                    FROM repairs
-                    WHERE customer_number IS NOT NULL
-                      AND REPLACE(
-                            REPLACE(
-                                REPLACE(
-                                    REPLACE(customer_number, ' ', ''),
-                                    '-', ''
-                                ),
-                                '(',
-                                ''
-                            ),
-                            ')',
-                            ''
-                          ) = %s
-                ) customer_history
-                WHERE customer_name IS NOT NULL
-                  AND TRIM(customer_name) <> ''
-                ORDER BY transaction_date DESC, sort_id DESC
-                LIMIT 1
-                """,
-                (
-                    normalized_number,
-                    normalized_number,
-                    normalized_number
-                )
-            )
-
-            number_customer = cur.fetchone()
-
-            if number_customer and number_customer.get("customer_name"):
-                # Use the resolved customer name so all historical
-                # transactions belonging to that customer are returned.
-                ledger_search = str(
-                    number_customer["customer_name"]
-                ).strip()
-
-        like = f"%{ledger_search}%"
+        like = f"%{search}%"
 
         cur.execute("""
             SELECT *
@@ -983,13 +1038,14 @@ def get_customer_ledger():
                         )
                     END AS debit_amount,
 
-                    /* For a payment-linked Product sale, this is the
-                       amount actually received on the original sale date.
-                       Later balance payments are separate Credit Payment
-                       rows and are added below. */
+                    /* Full payment = money received immediately.
+                       For a payment-linked sale, use the Payment record's
+                       paid amount as the credit so the outstanding becomes 0.
+                       For a normal direct/full sale without payment_id,
+                       the sale itself is fully paid. */
                     CASE
                         WHEN s.payment_id IS NOT NULL
-                        THEN COALESCE(s.total_amount, 0)
+                        THEN COALESCE(p.paid_amount, 0)
                         ELSE COALESCE(s.total_amount, 0)
                     END AS credit_amount,
 
@@ -1078,13 +1134,22 @@ def get_customer_ledger():
                         )
                     END AS debit_amount,
 
-                    /* For a pure Credit Sale there is no original
-                       Sales row, so this row represents only the original
-                       charge. Any money received later is represented by
-                       separate Credit Payment rows below.
-                       For Full/Partial sales, the original Sales row above
-                       already contains the amount received on sale day. */
-                    0 AS credit_amount,
+                    /* If the payment is already linked to a Sales row,
+                       its paid amount was already used as the credit in
+                       the Sales part above. Do not count it twice. */
+                    CASE
+                        WHEN EXISTS (
+                            SELECT 1
+                            FROM sales ps
+                            WHERE ps.payment_id = p.id
+                              AND ps.sale_type <> 'Credit Payment'
+                        )
+                        THEN 0
+                        ELSE COALESCE(
+                            p.paid_amount,
+                            0
+                        )
+                    END AS credit_amount,
 
                     p.customer_name,
 
@@ -1112,57 +1177,7 @@ def get_customer_ledger():
 
 
                 /* =====================================================
-                   3. LATER CREDIT PAYMENTS
-                   ===================================================== */
-
-                SELECT
-
-                    cp.sale_date AS transaction_date,
-
-                    'Payment' AS transaction_type,
-
-                    CONCAT(
-                        'Credit payment - ',
-                        cp.product_name
-                    ) AS description,
-
-                    0 AS debit_amount,
-
-                    COALESCE(
-                        cp.total_amount,
-                        0
-                    ) AS credit_amount,
-
-                    cp.customer_name,
-
-                    COALESCE(
-                        cp.customer_number,
-                        ''
-                    ) AS customer_number,
-
-                    cp.id AS sort_id
-
-                FROM sales cp
-
-                WHERE cp.sale_type = 'Credit Payment'
-
-                  AND (
-                      cp.customer_name LIKE %s
-
-                      OR
-
-                      COALESCE(
-                          cp.customer_number,
-                          ''
-                      ) LIKE %s
-                  )
-
-
-                UNION ALL
-
-
-                /* =====================================================
-                   4. DELIVERED REPAIR
+                   3. DELIVERED REPAIR
                    ===================================================== */
 
                 SELECT
@@ -1253,9 +1268,6 @@ def get_customer_ledger():
                 sort_id ASC
 
         """, (
-            like,
-            like,
-
             like,
             like,
 
@@ -5847,6 +5859,7 @@ def get_inventory():
                 purchase_price,
                 selling_price,
                 quantity,
+                minimum_stock,
                 created_at
             FROM inventory
             ORDER BY id DESC
@@ -5883,6 +5896,7 @@ def add_inventory():
         purchase_price = data.get("purchase_price", 0)
         selling_price = data.get("selling_price", 0)
         quantity = data.get("quantity", 0)
+        minimum_stock = data.get("minimum_stock", 2)
 
         if not product_name:
             return jsonify({
@@ -5906,6 +5920,7 @@ def add_inventory():
 
         try:
             quantity = int(quantity)
+            minimum_stock = int(minimum_stock)
             purchase_price = float(purchase_price or 0)
             selling_price = float(selling_price or 0)
         except (TypeError, ValueError):
@@ -5916,6 +5931,11 @@ def add_inventory():
         if quantity < 0:
             return jsonify({
                 "error": "Quantity cannot be negative"
+            }), 400
+
+        if minimum_stock < 0:
+            return jsonify({
+                "error": "Low stock limit cannot be negative"
             }), 400
 
         if purchase_price < 0 or selling_price < 0:
@@ -5935,9 +5955,10 @@ def add_inventory():
                 part_item,
                 purchase_price,
                 selling_price,
-                quantity
+                quantity,
+                minimum_stock
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         """, (
             product_name,
             category,
@@ -5945,7 +5966,8 @@ def add_inventory():
             part_item,
             purchase_price,
             selling_price,
-            quantity
+            quantity,
+            minimum_stock
         ))
 
         conn.commit()
@@ -5985,6 +6007,7 @@ def update_inventory(item_id):
         purchase_price = data.get("purchase_price", 0)
         selling_price = data.get("selling_price", 0)
         quantity = data.get("quantity", 0)
+        minimum_stock = data.get("minimum_stock", 2)
 
         if not product_name or not category or not model or not part_item:
             return jsonify({
@@ -5993,6 +6016,7 @@ def update_inventory(item_id):
 
         try:
             quantity = int(quantity)
+            minimum_stock = int(minimum_stock)
             purchase_price = float(purchase_price or 0)
             selling_price = float(selling_price or 0)
         except (TypeError, ValueError):
@@ -6003,6 +6027,11 @@ def update_inventory(item_id):
         if quantity < 0:
             return jsonify({
                 "error": "Quantity cannot be negative"
+            }), 400
+
+        if minimum_stock < 0:
+            return jsonify({
+                "error": "Low stock limit cannot be negative"
             }), 400
 
         if purchase_price < 0 or selling_price < 0:
@@ -6022,7 +6051,8 @@ def update_inventory(item_id):
                 part_item = %s,
                 purchase_price = %s,
                 selling_price = %s,
-                quantity = %s
+                quantity = %s,
+                minimum_stock = %s
             WHERE id = %s
         """, (
             product_name,
@@ -6032,6 +6062,7 @@ def update_inventory(item_id):
             purchase_price,
             selling_price,
             quantity,
+            minimum_stock,
             item_id
         ))
 

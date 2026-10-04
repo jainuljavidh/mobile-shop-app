@@ -126,6 +126,9 @@ const paymentsForm =
 
 let inventoryData = [];
 
+// Cached payment records used by the Sales A4 bill printer.
+let paymentsData = [];
+
 
 const inventorySearch =
     document.getElementById('inventorySearch');
@@ -493,6 +496,198 @@ function updateDashboardCards() {
 
 
 // ============================================================
+// A4 SALES BILL / PRINT
+// ============================================================
+
+function getPaymentForSale(sale) {
+    if (!sale || !sale.payment_id || !Array.isArray(paymentsData)) {
+        return null;
+    }
+
+    return paymentsData.find(
+        (payment) => Number(payment.id) === Number(sale.payment_id)
+    ) || null;
+}
+
+function getSaleBillDetails(sale) {
+    const payment = getPaymentForSale(sale);
+
+    if (payment) {
+        const total = Number(payment.total_amount) || 0;
+        const paid = Number(payment.paid_amount) || 0;
+        const balance = Math.max(0, total - paid);
+
+        let paymentType = 'Full Payment';
+        if (paid <= 0) {
+            paymentType = 'Credit';
+        } else if (paid < total) {
+            paymentType = 'Partial Payment';
+        }
+
+        return { total, paid, balance, paymentType };
+    }
+
+    const total =
+        (Number(sale.amount) || 0) +
+        (Number(sale.split_amount) || 0);
+
+    return {
+        total,
+        paid: total,
+        balance: 0,
+        paymentType: 'Full Payment'
+    };
+}
+
+function printSaleBill(sale) {
+    const details = getSaleBillDetails(sale);
+    const billDate = sale.sale_date || state.date || todayStr();
+    const customerName = String(sale.customer_name || 'Walk-in Customer').trim();
+    const customerNumber = String(sale.customer_number || '').trim();
+    const productName = String(sale.product_name || '').trim();
+    const quantity = Number(sale.quantity) || 1;
+
+    const safe = (value) => escapeHtml(value);
+
+    const billWindow = window.open('', '_blank', 'width=900,height=1100');
+
+    if (!billWindow) {
+        toast('Please allow pop-ups to open the A4 bill.', true);
+        return;
+    }
+
+    billWindow.document.open();
+    billWindow.document.write(`<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Sales Bill - ${safe(billDate)}</title>
+<style>
+    @page { size: A4; margin: 12mm; }
+    * { box-sizing: border-box; }
+    body {
+        margin: 0;
+        font-family: Arial, Helvetica, sans-serif;
+        color: #111;
+        background: #fff;
+    }
+    .page {
+        width: 100%;
+        min-height: 270mm;
+        padding: 8mm;
+        border: 1px solid #ddd;
+    }
+    .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        border-bottom: 2px solid #111;
+        padding-bottom: 12px;
+        margin-bottom: 18px;
+    }
+    .shop-name { font-size: 28px; font-weight: 700; }
+    .bill-title { font-size: 22px; font-weight: 700; text-align: right; }
+    .meta { font-size: 13px; line-height: 1.7; text-align: right; }
+    .customer {
+        margin: 15px 0;
+        padding: 12px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+    }
+    .customer-title { font-weight: 700; margin-bottom: 6px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 18px; }
+    th, td { border: 1px solid #bbb; padding: 10px; font-size: 13px; }
+    th { background: #f2f2f2; text-align: left; }
+    .right { text-align: right; }
+    .summary { width: 48%; margin-left: auto; margin-top: 18px; }
+    .summary-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 7px 10px;
+        border-bottom: 1px solid #ddd;
+        font-size: 14px;
+    }
+    .summary-row.total { font-size: 18px; font-weight: 700; border-top: 2px solid #111; }
+    .payment-type { font-weight: 700; }
+    .footer { margin-top: 45px; font-size: 12px; text-align: center; }
+    @media print {
+        .page { border: none; min-height: auto; }
+    }
+</style>
+</head>
+<body>
+<div class="page">
+    <div class="header">
+        <div>
+            <div class="shop-name">SHOP LEDGER</div>
+            <div>Mobile Shop Management</div>
+        </div>
+        <div>
+            <div class="bill-title">SALES BILL</div>
+            <div class="meta">Date: ${safe(billDate)}</div>
+        </div>
+    </div>
+
+    <div class="customer">
+        <div class="customer-title">Customer Details</div>
+        <div>Name: ${safe(customerName)}</div>
+        ${customerNumber ? `<div>Mobile: ${safe(customerNumber)}</div>` : ''}
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Product / Item</th>
+                <th class="right">Qty</th>
+                <th class="right">Amount</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>1</td>
+                <td>${safe(productName)}</td>
+                <td class="right">${quantity}</td>
+                <td class="right">${fmt(details.total)}</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div class="summary">
+        <div class="summary-row">
+            <span>Total Amount</span>
+            <strong>${fmt(details.total)}</strong>
+        </div>
+        <div class="summary-row">
+            <span>Payment Type</span>
+            <strong class="payment-type">${safe(details.paymentType)}</strong>
+        </div>
+        <div class="summary-row">
+            <span>Paid Amount</span>
+            <strong>${fmt(details.paid)}</strong>
+        </div>
+        <div class="summary-row">
+            <span>Balance Amount</span>
+            <strong>${fmt(details.balance)}</strong>
+        </div>
+        <div class="summary-row total">
+            <span>Amount Received</span>
+            <strong>${fmt(details.paid)}</strong>
+        </div>
+    </div>
+
+    <div class="footer">
+        Thank you for your business.<br>
+        This bill was generated from Shop Ledger.
+    </div>
+</div>
+</body>
+</html>`);
+    billWindow.document.close();
+    billWindow.focus();
+}
+
+// ============================================================
 // SALES - LOAD
 // ============================================================
 
@@ -714,6 +909,17 @@ async function loadSales() {
                 if (actionCell) {
                     actionCell.appendChild(deleteButton);
                 }
+            }
+
+            // Print button is always available after the sale is saved.
+            // It opens an A4 bill only when the user clicks Print.
+            const printButton = document.createElement('button');
+            printButton.type = 'button';
+            printButton.className = 'row-edit';
+            printButton.textContent = 'Print';
+            printButton.addEventListener('click', () => printSaleBill(r));
+            if (actionCell) {
+                actionCell.appendChild(printButton);
             }
 
             body.appendChild(tr);
@@ -1966,8 +2172,9 @@ function renderInventoryAlerts() {
 
     const lowStock =
         inventoryData.filter((item) => {
-            const quantity = Number(item.quantity);
-            return quantity > 0 && quantity <= 2;
+            const quantity = Number(item.quantity) || 0;
+            const minimumStock = Number(item.minimum_stock) || 0;
+            return quantity > 0 && minimumStock > 0 && quantity <= minimumStock;
         });
 
     const totalAlerts =
@@ -2007,11 +2214,14 @@ function renderInventoryAlerts() {
 
                     const quantity =
                         Number(item.quantity) || 0;
+                    const minimumStock =
+                        Number(item.minimum_stock) || 0;
 
                     return `
                         <div class="inventory-alert-product">
                             <span>${name}</span>
                             <strong>${quantity}</strong>
+                            ${minimumStock > 0 && quantity > 0 ? `<small>Limit: ${minimumStock}</small>` : ''}
                         </div>
                     `;
 
@@ -3038,9 +3248,12 @@ function renderInventoryTable() {
         } else if (quantity === 0) {
             status = 'Out of Stock';
             statusClass = 'stock-out';
-        } else if (quantity <= 2) {
-            status = 'Low Stock';
-            statusClass = 'stock-low';
+        } else {
+            const minimumStock = Number(r.minimum_stock) || 0;
+            if (minimumStock > 0 && quantity <= minimumStock) {
+                status = 'Low Stock';
+                statusClass = 'stock-low';
+            }
         }
 
         const tr =
@@ -3272,7 +3485,9 @@ if (inventoryForm) {
                     Number(f.selling_price.value) || 0,
 
                 quantity:
-                    Number(f.quantity.value) || 0
+                    Number(f.quantity.value) || 0,
+
+                minimum_stock: 2
             };
 
             if (!payload.product_name) {
@@ -3424,6 +3639,16 @@ async function editInventory(item) {
             return;
         }
 
+        const minimumStockInput =
+            prompt(
+                'Low Stock Limit (0 = disable alert):',
+                Number(item.minimum_stock) || 0
+            );
+
+        if (minimumStockInput === null) {
+            return;
+        }
+
         const cleanProductName =
             productName.trim();
 
@@ -3444,6 +3669,9 @@ async function editInventory(item) {
 
         const quantity =
             Number(quantityInput);
+
+        const minimumStock =
+            Number(minimumStockInput);
 
         if (!cleanProductName || !cleanCategory || !cleanModel || !cleanPartItem) {
             toast(
@@ -3478,6 +3706,18 @@ async function editInventory(item) {
             return;
         }
 
+        if (
+            !Number.isFinite(minimumStock) ||
+            minimumStock < 0 ||
+            !Number.isInteger(minimumStock)
+        ) {
+            toast(
+                'Low Stock Limit must be a whole number 0 or greater',
+                true
+            );
+            return;
+        }
+
         const payload = {
             product_name:
                 cleanProductName,
@@ -3498,7 +3738,10 @@ async function editInventory(item) {
                 sellingPrice,
 
             quantity:
-                quantity
+                quantity,
+
+            minimum_stock:
+                minimumStock
         };
 
         await api(
@@ -5210,6 +5453,7 @@ async function loadPayments() {
             `/api/payments?${currentFilterQuery()}`
         );
 
+        paymentsData = Array.isArray(rows) ? rows : [];
 
         const body =
             document.getElementById(
@@ -5391,6 +5635,30 @@ async function loadPayments() {
 
             }
 
+
+            const printButton = document.createElement('button');
+            printButton.type = 'button';
+            printButton.className = 'row-edit';
+            printButton.textContent = 'Print';
+            printButton.addEventListener('click', () => {
+                const billLikeSale = {
+                    sale_date: r.payment_date || state.date,
+                    customer_name: r.customer_name,
+                    customer_number: r.customer_number || '',
+                    product_name: r.reference_name || 'Mobile Shop Sale',
+                    quantity: 1,
+                    amount: Number(r.total_amount) || 0,
+                    split_amount: 0,
+                    total_amount: Number(r.paid_amount) || 0,
+                    payment_id: r.id
+                };
+                printSaleBill(billLikeSale);
+            });
+
+            const actionButtons = tr.querySelector('td:last-child');
+            if (actionButtons) {
+                actionButtons.appendChild(printButton);
+            }
 
             const deleteButton =
                 tr.querySelector(

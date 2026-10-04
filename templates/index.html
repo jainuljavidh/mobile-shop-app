@@ -412,7 +412,7 @@
             <div class="header-actions">
 
                 <span class="logged-in-user">
-                    User: <strong>{{ session.get("username", "") }}</strong>
+                    Profile: <strong>{{ session.get("username", "") }}</strong>
                 </span>
 
                 <form method="POST" action="{{ url_for('signout') }}">
@@ -488,6 +488,20 @@
         <span class="nav-icon">🛒</span>
         <span class="nav-label">Sales</span>
     </button>
+    <button type="button"
+        class="section-nav-btn"
+        data-section="rechargeSection">
+    <span class="nav-icon">📱</span>
+    <span class="nav-label">SIM Recharge</span>
+</button>
+<button type="button" class="section-nav-btn" data-section="customerLedgerSection">
+        <span class="nav-icon">📒</span>
+        <span class="nav-label">Ledger</span>
+    </button>
+    <button type="button" class="section-nav-btn" data-section="expensesSection">
+        <span class="nav-icon">💰</span>
+        <span class="nav-label">Expenses</span>
+    </button>
 
     <button type="button" class="section-nav-btn" data-section="purchasesSection">
         <span class="nav-icon">📦</span>
@@ -499,10 +513,7 @@
         <span class="nav-label">Inventory</span>
     </button>
 
-    <button type="button" class="section-nav-btn" data-section="expensesSection">
-        <span class="nav-icon">💰</span>
-        <span class="nav-label">Expenses</span>
-    </button>
+    
 
     <button type="button" class="section-nav-btn" data-section="enquiriesSection">
         <span class="nav-icon">👥</span>
@@ -516,10 +527,7 @@
 
     
 
-    <button type="button" class="section-nav-btn" data-section="customerLedgerSection">
-        <span class="nav-icon">📒</span>
-        <span class="nav-label">Ledger</span>
-    </button>
+    
 
     <button type="button" class="section-nav-btn" data-section="paymentsSection">
         <span class="nav-icon">💳</span>
@@ -2349,6 +2357,51 @@
             </div>
 
         </section>
+
+        <!-- =====================================================
+     DATABASE BACKUP
+====================================================== -->
+
+<section class="ledger-card" id="databaseBackupSection">
+
+    <div class="ledger-head">
+        <div>
+            <h2>💾 Database Backup</h2>
+            <p>Create a complete backup of your Shop Ledger database.</p>
+        </div>
+    </div>
+
+    <div style="
+        padding: 20px;
+        border: 1px solid var(--line, #e5e7eb);
+        border-radius: 12px;
+        background: #ffffff;
+        text-align: center;
+    ">
+        <div style="font-size: 42px; margin-bottom: 10px;">💾</div>
+
+        <h3 style="margin: 0 0 8px;">
+            Backup Your Database
+        </h3>
+
+        <p style="margin: 0 0 18px; opacity: 0.75;">
+            Download a complete SQL backup of your current Shop Ledger data.
+        </p>
+
+        <button
+            type="button"
+            class="primary-btn"
+            onclick="window.location.href='/api/database-backup';"
+        >
+            💾 Create Database Backup
+        </button>
+
+        <p style="margin: 14px 0 0; font-size: 13px; opacity: 0.65;">
+            The backup will be downloaded to your computer and saved in the local backup folder.
+        </p>
+    </div>
+
+</section>
 
 
     </main>
